@@ -77,11 +77,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Mecânico de Fusca" },
+      {
+        name: "description",
+        content:
+          "Chatbot especialista em mecânica de VW Fusca para diagnóstico e reparo do motor a ar.",
+      },
+      { name: "author", content: "Mecânico de Fusca" },
+      { property: "og:title", content: "Mecânico de Fusca" },
+      {
+        property: "og:description",
+        content:
+          "Seu mestre mecânico virtual especialista em VW Fusca a ar.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
