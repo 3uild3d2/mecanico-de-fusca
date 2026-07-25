@@ -1,8 +1,9 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { ChatApp } from "@/components/chat/ChatApp";
-import { ensureThread } from "@/lib/threads";
+import { ChatApp } from "@/features/chat/components/ChatApp";
+import { ensureThread } from "@/features/chat/api";
 
 export const Route = createFileRoute("/c/$threadId")({
   head: () => ({
@@ -22,10 +23,24 @@ function ThreadPage() {
   const { threadId } = useParams({ from: "/c/$threadId" });
   const [ready, setReady] = useState(false);
 
-  // localStorage is client-only; make sure the thread record exists before chatting.
   useEffect(() => {
-    ensureThread(threadId);
-    setReady(true);
+    let cancelled = false;
+
+    async function loadThread() {
+      try {
+        await ensureThread(threadId);
+        if (!cancelled) setReady(true);
+      } catch {
+        toast.error("Não foi possível carregar esta conversa do Firebase.");
+      }
+    }
+
+    setReady(false);
+    void loadThread();
+
+    return () => {
+      cancelled = true;
+    };
   }, [threadId]);
 
   if (!ready) {

@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { toast } from "sonner";
 
-import { createThread, getThreads } from "@/lib/threads";
+import { createThread, getThreads, waitForThreadsReady } from "@/features/chat/api";
 import fuscaLogo from "@/assets/fusca-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -30,13 +31,32 @@ function Index() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const existing = getThreads();
-    const thread = existing.length > 0 ? existing[0] : createThread();
-    navigate({
-      to: "/c/$threadId",
-      params: { threadId: thread.id },
-      replace: true,
-    });
+    let cancelled = false;
+
+    async function bootstrapThread() {
+      try {
+        await waitForThreadsReady();
+        if (cancelled) return;
+
+        const existing = getThreads();
+        const thread = existing.length > 0 ? existing[0] : await createThread();
+        if (cancelled) return;
+
+        navigate({
+          to: "/c/$threadId",
+          params: { threadId: thread.id },
+          replace: true,
+        });
+      } catch {
+        toast.error("Não foi possível carregar suas conversas do Firebase.");
+      }
+    }
+
+    void bootstrapThread();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   return (
@@ -48,9 +68,7 @@ function Index() {
         height={1024}
         className="size-20 animate-pulse object-contain"
       />
-      <p className="font-display text-2xl tracking-wide text-foreground">
-        Mecânico de Fusca
-      </p>
+      <p className="font-display text-2xl tracking-wide text-foreground">Mecânico de Fusca</p>
       <p className="text-sm text-muted-foreground">Aquecendo o motor...</p>
     </div>
   );

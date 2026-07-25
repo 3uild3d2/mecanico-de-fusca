@@ -7,11 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { Toaster } from "@/components/ui/sonner";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "@/shared/ui/sonner";
+import { TooltipProvider } from "@/shared/ui/tooltip";
 
 function NotFoundComponent() {
   return (
@@ -38,9 +38,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -88,18 +85,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Mecânico de Fusca" },
       {
         property: "og:description",
-        content:
-          "Seu mestre mecânico virtual especialista em VW Fusca a ar.",
+        content: "Seu mestre mecânico virtual especialista em VW Fusca a ar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Mecânico de Fusca" },
-      { name: "description", content: "Fusca Mestre is a chatbot UI for a VW Beetle mechanic expert." },
-      { property: "og:description", content: "Fusca Mestre is a chatbot UI for a VW Beetle mechanic expert." },
-      { name: "twitter:description", content: "Fusca Mestre is a chatbot UI for a VW Beetle mechanic expert." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/af4f0d94-5c93-4bab-96aa-3d2a1cd7055f/id-preview-d9a5bac5--9f02a924-6dad-4902-8c18-c84637a733eb.lovable.app-1782410367088.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/af4f0d94-5c93-4bab-96aa-3d2a1cd7055f/id-preview-d9a5bac5--9f02a924-6dad-4902-8c18-c84637a733eb.lovable.app-1782410367088.png" },
+      {
+        name: "twitter:description",
+        content: "Seu mestre mecânico virtual especialista em VW Fusca a ar.",
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -126,7 +120,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
@@ -143,9 +137,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster richColors position="top-center" />
+      <TooltipProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster richColors position="top-center" />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
