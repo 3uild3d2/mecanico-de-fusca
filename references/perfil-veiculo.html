@@ -1,0 +1,181 @@
+<!--
+  =====================================================================
+  MECÂNICO DE FUSCA · Perfil do Veículo ("Minha Garagem")
+  =====================================================================
+  Bloco autocontido para o site principal.
+
+  COMO INSERIR (para o agente que for integrar):
+  1. É um <section class="vwg"> com CSS isolado pelo prefixo .vwg (não
+     vaza para o resto do site) e um <script> próprio. Pode colar direto.
+  2. As opções de cada <select> vêm do objeto window.FUSCA_OPTIONS (logo
+     no <script>). Para virar componente React/Vue, reaproveite esses
+     arrays em vez de recriar à mão.
+  3. Leia os dados preenchidos chamando window.getFichaVeiculo() -> retorna
+     um objeto pronto para salvar (Firebase/Supabase) e para mandar como
+     contexto ao agente no n8n. Os name= dos campos já são as chaves.
+  4. O botão "Salvar ficha" dispara o evento customizado 'ficha:salvar'
+     (event.detail = objeto da ficha). Troque pela sua chamada de API.
+  =====================================================================
+-->
+<section class="vwg">
+  <style>
+    .vwg *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .vwg{display:block;background:#1b2024;border:1px solid #11161a;border-radius:10px;overflow:hidden;color:#e7decd;max-width:720px}
+    .vwg-head{display:flex;align-items:center;gap:11px;padding:13px 18px;background:#20272c;border-bottom:1px solid #0e1215}
+    .vwg-badge{width:32px;height:32px;border-radius:8px;background:#23292e;border:1px solid #ef9f27;display:flex;align-items:center;justify-content:center;color:#f4b43c;font-size:18px}
+    .vwg-title{color:#f0e8d6;font-size:15px;font-weight:500}
+    .vwg-sub{color:#7f8a86;font-size:11px;margin-top:2px}
+    .vwg-cars{display:flex;gap:10px;padding:14px 18px;flex-wrap:wrap}
+    .vwg-car{flex:1;min-width:150px;background:#1f262b;border:1px solid #2f383e;border-radius:9px;padding:10px;cursor:pointer}
+    .vwg-car.is-active{background:#222a2f;border-color:#ef9f27}
+    .vwg-car b{color:#c7cfca;font-size:13px;font-weight:500}
+    .vwg-car.is-active b{color:#f0e8d6}
+    .vwg-car small{display:block;color:#7f8a86;font-size:11px;margin-top:5px}
+    .vwg-add{min-width:120px;flex:0 0 auto;border:1px dashed #3a444a;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;color:#7f8a86;font-size:12px;cursor:pointer}
+    .vwg-body{padding:0 18px 18px}
+    .vwg-sheet{background:#f3ecda;border:1px solid #d8cdb0;border-radius:5px;overflow:hidden}
+    .vwg-stripe{height:7px;background:repeating-linear-gradient(45deg,#1b2024,#1b2024 9px,#f4b43c 9px,#f4b43c 18px)}
+    .vwg-sheet-in{padding:14px 16px 16px}
+    .vwg-sheet-head{display:flex;align-items:center;gap:7px;border-bottom:1px dashed #c9bd9d;padding-bottom:8px;margin-bottom:14px;color:#5a4a2a;font-size:11px;letter-spacing:.1em}
+    .vwg-sec{color:#9a3c1d;font-size:10px;letter-spacing:.1em;margin-bottom:9px}
+    .vwg-grid{display:grid;gap:11px 12px;margin-bottom:16px}
+    .vwg-grid.c2{grid-template-columns:1fr 1fr}
+    .vwg-grid.c3{grid-template-columns:1fr 1fr 1fr}
+    .vwg-field{display:block}
+    .vwg-field>span{display:block;color:#6a5d3e;font-size:11px;margin-bottom:4px}
+    .vwg-field .hint{color:#b0a079}
+    .vwg-field input,.vwg-field select,.vwg textarea{width:100%;background:#fbf6ea;border:1px solid #c9bd9d;border-radius:6px;padding:8px 10px;color:#2c2922;font-size:13px;appearance:none;-webkit-appearance:none}
+    .vwg-field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239a8c66' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:28px}
+    .vwg-field input:focus,.vwg-field select:focus,.vwg textarea:focus{outline:none;border-color:#ba7517;box-shadow:0 0 0 2px rgba(186,117,23,.25)}
+    .vwg-seg{display:flex;background:#ece2c9;border:1px solid #c9bd9d;border-radius:6px;padding:2px}
+    .vwg-seg input{position:absolute;opacity:0;pointer-events:none}
+    .vwg-seg label{flex:1;text-align:center;font-size:12px;padding:6px;color:#8a7c58;border-radius:4px;cursor:pointer}
+    .vwg-seg input:checked+label{background:#ef9f27;color:#3a2402}
+    .vwg textarea{min-height:64px;resize:vertical;line-height:1.5;font-family:inherit}
+    .vwg-actions{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px dashed #c9bd9d}
+    .vwg-btn{font-size:12px;padding:8px 16px;border-radius:7px;border:1px solid #c9bd9d;background:transparent;color:#6a5d3e;cursor:pointer}
+    .vwg-btn.primary{background:#ef9f27;border-color:#ef9f27;color:#3a2402;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+  </style>
+
+  <div class="vwg-head">
+    <div class="vwg-badge" aria-hidden="true"><i class="ti ti-car-garage"></i></div>
+    <div>
+      <div class="vwg-title">Minha garagem</div>
+      <div class="vwg-sub">os dados ajudam o mecânico a acertar o diagnóstico</div>
+    </div>
+  </div>
+
+  <div class="vwg-cars">
+    <div class="vwg-car is-active"><b>Besouro</b><small>Fusca 1300 · 1972 · 12V</small></div>
+    <div class="vwg-car"><b>Carcará</b><small>Fusca 1600 · 1979 · 12V</small></div>
+    <div class="vwg-add"><i class="ti ti-plus" aria-hidden="true"></i> Adicionar</div>
+  </div>
+
+  <div class="vwg-body">
+    <form class="vwg-sheet" id="ficha-veiculo" autocomplete="off">
+      <div class="vwg-stripe" aria-hidden="true"></div>
+      <div class="vwg-sheet-in">
+        <div class="vwg-sheet-head"><i class="ti ti-clipboard-list" aria-hidden="true"></i> FICHA TÉCNICA DO VEÍCULO</div>
+
+        <div class="vwg-sec">IDENTIFICAÇÃO</div>
+        <div class="vwg-grid c2">
+          <label class="vwg-field"><span>Apelido</span><input name="apelido" placeholder="ex.: Besouro" value="Besouro"></label>
+          <label class="vwg-field"><span>Modelo</span><select name="modelo" data-opts="modelos"></select></label>
+          <label class="vwg-field"><span>Ano (carroceria)</span><select name="ano" data-opts="anos"></select></label>
+        </div>
+
+        <div class="vwg-sec">MECÂNICA</div>
+        <div class="vwg-grid c2">
+          <label class="vwg-field"><span>Motor / cilindrada</span><select name="motor" data-opts="motores"></select></label>
+          <label class="vwg-field"><span>Ano do motor <span class="hint">(se trocado)</span></span><input name="ano_motor" inputmode="numeric" placeholder="ex.: 1975"></label>
+          <label class="vwg-field"><span>Carburação</span><select name="carburacao" data-opts="carburacoes"></select></label>
+          <label class="vwg-field"><span>Combustível</span><select name="combustivel" data-opts="combustiveis"></select></label>
+        </div>
+        <div class="vwg-grid c2">
+          <div>
+            <span style="display:block;color:#6a5d3e;font-size:11px;margin-bottom:4px">Ignição</span>
+            <div class="vwg-seg">
+              <input type="radio" name="ignicao" id="ig-pl" value="platinado" checked><label for="ig-pl">Platinado</label>
+              <input type="radio" name="ignicao" id="ig-el" value="eletronica"><label for="ig-el">Eletrônica</label>
+            </div>
+          </div>
+          <div>
+            <span style="display:block;color:#6a5d3e;font-size:11px;margin-bottom:4px">Sistema elétrico</span>
+            <div class="vwg-seg">
+              <input type="radio" name="sistema_eletrico" id="se-6" value="6V"><label for="se-6">6V</label>
+              <input type="radio" name="sistema_eletrico" id="se-12" value="12V" checked><label for="se-12">12V</label>
+            </div>
+          </div>
+        </div>
+
+        <label class="vwg-field"><span>Modificações</span><textarea name="modificacoes" placeholder="ex.: coletor esportivo, ventoinha de 12 pás, filtro cônico…"></textarea></label>
+
+        <div class="vwg-actions">
+          <button type="reset" class="vwg-btn">Cancelar</button>
+          <button type="submit" class="vwg-btn primary"><i class="ti ti-device-floppy" aria-hidden="true"></i> Salvar ficha</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      // Dados reais do Fusca brasileiro (1959–1986 e 1993–1996 "Itamar").
+      var anos = [];
+      [1996, 1995, 1994, 1993].forEach(function (y) { anos.push(String(y)); });
+      for (var y = 1986; y >= 1959; y--) anos.push(String(y));
+      anos.push("Não sei / outro");
+
+      window.FUSCA_OPTIONS = {
+        modelos: [
+          "Fusca 1200", "Fusca 1300", "Fusca 1300 L", "Fusca 1500 (Fuscão)",
+          "Fusca 1600", "Fusca 1600 S (carburação dupla)",
+          "Fusca 1600 Itamar (1993–1996)", "Fusca Conversível", "Outro / não sei"
+        ],
+        anos: anos,
+        motores: [
+          "1200 — 1.192 cm³", "1300 — 1.285 cm³", "1500 — 1.493 cm³",
+          "1600 — 1.584 cm³", "1600 a álcool (Itamar)", "Motor AP (conversão)",
+          "Outro / não sei"
+        ],
+        carburacoes: [
+          "Solex/Brosol H 30/31 PICT (1600 gasolina)",
+          "Solex/Brosol 30 PIC (1500/1600)",
+          "Solex 30 PICT (1300)",
+          "Solex 28 PICT (1200/1300 antigo)",
+          "Dupla — Solex 32 PDSIT (1600 S)",
+          "Carburador a álcool (Itamar)",
+          "Injeção eletrônica (conversão)",
+          "Carburador esportivo / Weber (modificado)",
+          "Outro / não sei"
+        ],
+        combustiveis: [
+          "Gasolina", "Etanol (álcool)", "Flex (adaptado)", "GNV (instalado)", "Outro / não sei"
+        ]
+      };
+
+      var root = document.currentScript.closest(".vwg");
+      root.querySelectorAll("select[data-opts]").forEach(function (sel) {
+        (window.FUSCA_OPTIONS[sel.dataset.opts] || []).forEach(function (txt) {
+          var o = document.createElement("option");
+          o.value = txt; o.textContent = txt; sel.appendChild(o);
+        });
+      });
+
+      // Lê a ficha como objeto pronto para salvar / mandar ao agente.
+      window.getFichaVeiculo = function () {
+        var f = root.querySelector("#ficha-veiculo");
+        var data = {};
+        new FormData(f).forEach(function (v, k) { data[k] = v; });
+        return data;
+      };
+
+      root.querySelector("#ficha-veiculo").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var ficha = window.getFichaVeiculo();
+        root.dispatchEvent(new CustomEvent("ficha:salvar", { bubbles: true, detail: ficha }));
+        console.log("[Fusca] ficha salva:", ficha);
+      });
+    })();
+  </script>
+</section>
