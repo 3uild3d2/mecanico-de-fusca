@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Regras do Firestore. Versionadas junto com o código — nunca edite pelo console,
+// que não tem histórico nem revisão.
+//
+// Princípio: o usuário é dono dos próprios dados, mas NÃO dos próprios direitos
+// de acesso. isAdmin, plan e subscription só o servidor escreve.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Campos de entitlement: somente-leitura para o dono.
+    function touchesEntitlements() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['isAdmin', 'plan', 'subscription', 'subscriptionStatus', 'planExpiresAt']);
+    }
+
+    function declaresEntitlements() {
+      return request.resource.data.keys()
+        .hasAny(['isAdmin', 'plan', 'subscription', 'subscriptionStatus', 'planExpiresAt']);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && !declaresEntitlements();
+      allow update: if isOwner(userId) && !touchesEntitlements();
+      // Exclusão de conta passa pelo servidor, que precisa limpar Storage junto.
+      allow delete: if false;
+
+      match /threads/{threadId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /vehicle/{vehicleId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Nada mais é acessível pelo cliente.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
