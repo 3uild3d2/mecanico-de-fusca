@@ -4,6 +4,12 @@ import { z } from "zod";
 // públicas por definição — nada de segredo aqui. Segredos ficam em src/server/.
 
 const clientEnvSchema = z.object({
+  VITE_SUPABASE_URL: z.string().url("VITE_SUPABASE_URL precisa ser uma URL válida"),
+  VITE_SUPABASE_PUBLISHABLE_KEY: z
+    .string()
+    .min(1, "VITE_SUPABASE_PUBLISHABLE_KEY é obrigatória (Settings > API no dashboard)"),
+
+  // Firebase sai de cena ao fim da Fase 2; opcional enquanto os dois coexistem.
   VITE_FIREBASE_API_KEY: z.string().min(1, "VITE_FIREBASE_API_KEY é obrigatória"),
   VITE_FIREBASE_AUTH_DOMAIN: z.string().min(1, "VITE_FIREBASE_AUTH_DOMAIN é obrigatória"),
   VITE_FIREBASE_PROJECT_ID: z.string().min(1, "VITE_FIREBASE_PROJECT_ID é obrigatória"),

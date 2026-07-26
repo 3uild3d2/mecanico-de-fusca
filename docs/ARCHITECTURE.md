@@ -204,14 +204,16 @@ Cada fase deixa o app funcionando. Nada de big bang.
 - ✅ Painel de raciocínio (`features/chat/hipoteses.ts` + `HypothesisPanel.tsx`), com o estado derivado das mensagens em vez de armazenamento próprio
 - ⏳ Eval do raciocínio e UI do histórico — ver pendências em `docs/CONTEXTO.md`
 
-### Fase 2 — Migração para Supabase
+### Fase 2 — Migração para Supabase 🔄 _(em andamento — estado detalhado em `docs/CONTEXTO.md`)_
 
-- Migrations com schema + RLS, incluindo `vehicle_events`
-- Auth anônimo + Google (no Android, `signInWithIdToken` com o plugin nativo — é o ponto de atrito conhecido)
-- Reescrever `threads` / `vehicles` / `events` / `auth` sobre o Supabase, usando **TanStack Query** (já é dependência e hoje não é usada; substitui os singletons de `useSyncExternalStore` escritos à mão)
-- Storage + política de retenção dos anexos
-- Exclusão de conta (seção 3.3)
-- Sem script de migração de dados: o app nunca esteve no ar com usuários reais
+- ✅ Migrations com schema + RLS (1–5 **aplicadas** ao banco em 2026-07-26; 6–7 escritas, aguardando aplicação via `supabase/aplicar-pendentes.sql`)
+- ✅ RLS verificada com dois usuários reais: isolamento, bloqueio de `is_admin` e de `subscriptions`
+- 🔄 Auth anônimo + Google: providers ligados, `features/auth/supabase-auth.ts` escrito (`linkIdentity` preserva o histórico); falta trocar os componentes e testar o login de ponta a ponta. No Android, `signInWithIdToken` com o plugin nativo — é o ponto de atrito conhecido.
+- ⏳ Reescrever `threads` / `vehicles` / `events` / `auth` sobre o Supabase, usando **TanStack Query** (já é dependência e hoje não é usada; substitui os singletons de `useSyncExternalStore` escritos à mão)
+- ⏳ Upload de anexos para o bucket `anexos` (caminho `uid/threadId/...`); retenção de 48h exige rotina própria — Supabase não tem lifecycle rule (ver pendências)
+- ⏳ Exclusão de conta (seção 3.3; `apagar_conta` já existe no banco)
+- ⏳ Aposentar o Firebase depois do login Google validado
+- Sem script de migração de dados: só existe o perfil do dono, decisão dele de começar limpo
 
 ### Fase 3 — RAG (pgvector)
 

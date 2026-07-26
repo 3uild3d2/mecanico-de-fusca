@@ -12,7 +12,7 @@ Regras de trabalho neste repositório. Leia antes de tocar em qualquer código.
 2. **`docs/ARCHITECTURE.md`** — o desenho alvo, os problemas conhecidos e o roteiro por fases. É o norte.
 3. **`docs/CONTEXTO.md`** — o diário: o que já foi feito, por quê, e o que está pendente. É o estado atual.
 
-Se os três divergirem, `docs/CONTEXTO.md` descreve a realidade e os outros dois descrevem a intenção. Corrija o que estiver errado.
+Se os três divergirem, `docs/CONTEXTO.md` descreve a realidade e os outros dois descrevem a intenção.
 
 ---
 
@@ -35,10 +35,14 @@ npm run build      # build de produção
 Organização **por domínio**, não por tipo de arquivo.
 
 ```
+supabase/
+├── migrations/         Schema + RLS. FONTE DA VERDADE do banco.
+└── aplicar-*.sql       Gerados para o dono colar no SQL Editor. Não editar à mão.
 src/
 ├── features/           Domínios. Cada um dono do seu próprio código.
-│   ├── auth/           api.ts (sessão) · entitlements.ts (direitos, só leitura)
-│   ├── chat/           api.ts · model.ts · attachments.ts · components/
+│   ├── auth/           api.ts (Firebase, em aposentadoria) · supabase-auth.ts
+│   │                   entitlements.ts (direitos, só leitura)
+│   ├── chat/           api.ts · model.ts · hipoteses.ts · attachments.ts · components/
 │   └── garage/         api.ts · model.ts (ficha)
 │                       events.ts · events-api.ts (memória diagnóstica)
 ├── server/             NUNCA chega ao cliente. Protegido por vite.config.ts.
@@ -46,13 +50,15 @@ src/
 │   └── config/env.ts   segredos, validados na inicialização
 ├── shared/             Transversal, sem regra de negócio.
 │   ├── config/env.ts   variáveis VITE_* (públicas)
-│   ├── lib/            firebase · utils · erros
+│   ├── lib/            supabase · database.types · firebase (legado) · utils · erros
 │   ├── hooks/
 │   └── ui/             componentes base (shadcn)
 ├── routes/             Roteamento file-based. Fino: só compõe features.
 ├── router.tsx  server.ts  start.ts  styles.css   ← pontos de entrada, não mova
 └── routeTree.gen.ts    GERADO. Nunca edite à mão.
 ```
+
+Durante a Fase 2, Firebase e Supabase coexistem. O estado exato da troca está em `docs/CONTEXTO.md` — leia antes de mexer em qualquer `api.ts`.
 
 ### Papel de cada camada
 
@@ -67,7 +73,10 @@ src/
 
 ### Ferramentas do agente
 
-`registrarEvento` (`src/server/ai/tools.ts`) é definida **sem `execute`**. No AI SDK isso a torna ferramenta de _cliente_: o agente decide chamar, e quem grava é o navegador — em `onToolCall`, dentro de `ChatWindow.tsx`, onde existe a sessão autenticada do Firestore.
+As duas ferramentas em `src/server/ai/tools.ts` são definidas **sem `execute`**. No AI SDK isso as torna ferramentas de _cliente_: o agente decide chamar, e quem executa é o navegador — em `onToolCall`, dentro de `ChatWindow.tsx`, onde existe a sessão autenticada do banco.
+
+- `registrarEvento` — grava um marco no histórico do carro.
+- `atualizarHipoteses` — publica o raciocínio no painel. Não tem efeito colateral: o estado é derivado das partes das mensagens (`features/chat/hipoteses.ts`). O prompt **exige** a chamada em todo turno de diagnóstico; se mexer no prompt, preserve essa regra ou o painel congela mostrando raciocínio velho.
 
 Se for adicionar ferramenta nova, decida conscientemente de que lado ela roda:
 
@@ -89,7 +98,7 @@ Existem duas coisas parecidas e diferentes:
 
 1. **O servidor é a autoridade.** O cliente pede, o servidor decide. Vale dobrado para entitlements (`isAdmin`, `plan`, assinatura) e quota. O cliente **lê** direitos de acesso; nunca os escreve. Já foi quebrado uma vez — ver `docs/ARCHITECTURE.md` §3.2.
 
-2. **Schema e regras no repositório.** `firestore.rules`, `storage.rules` e (na Fase 2) as migrations do Supabase são a fonte da verdade. Nunca altere estrutura ou regra pelo console — o console não tem histórico nem revisão.
+2. **Schema e regras no repositório.** `supabase/migrations/` é a fonte da verdade do banco (e `firestore.rules`/`storage.rules` do Firebase legado, enquanto existir). Nunca altere estrutura ou política pelo dashboard — ele não tem histórico nem revisão. Mudança de schema = migration nova + arquivo `aplicar-*.sql` regenerado para o dono.
 
 3. **Nada de `as` para validar entrada.** Um cast não verifica nada em tempo de execução. Todo payload que cruza a fronteira da rede passa por zod. Ver `src/server/ai/schema.ts`.
 
@@ -102,6 +111,26 @@ Existem duas coisas parecidas e diferentes:
 7. **O prompt é código.** `src/server/ai/prompt.ts` carrega o método de diagnóstico — é o que separa este produto de um chatbot genérico. Mexa nele com o mesmo cuidado de qualquer outro código: revisão, `PROMPT_VERSION` incrementada, e ciente de que não há eval automatizado ainda (ver pendências em `docs/CONTEXTO.md`).
 
 8. **Não invente número.** Torque, folga e ponto errados quebram motor ou machucam alguém. O prompt instrui o agente a dar faixa e mandar conferir quando não tem certeza — não afrouxe isso, e aplique o mesmo critério ao conteúdo que você escrever para o RAG.
+
+---
+
+## O dono do projeto
+
+O dono (Diogo) **não é desenvolvedor**. Regras de comunicação, aprendidas na prática:
+
+- **Escreva pouco.** Toda resposta termina com uma seção **"Preciso de você"** listando ações concretas e numeradas — ou dizendo explicitamente que não há nenhuma. Detalhe técnico vai para `docs/CONTEXTO.md`, não para o chat.
+- **Nada de CLI para ele.** SQL vai por arquivo único (`begin`/`commit`) que ele cola no SQL Editor do dashboard e roda uma vez. Passo a passo numerado, um clique por item, com o que esperar de resultado ("faixa verde" / "faixa vermelha").
+- **Segredos nunca circulam no chat.** Instrua onde colar (`.env`, dashboard); nunca peça o valor. A `sb_secret_` e o client secret do Google já seguiram esse fluxo.
+- Se uma tela dele não bater com a instrução, peça print e oriente pelo que estiver aparecendo.
+
+## Roadmap operacional
+
+`docs/roadmap.html` é a ordem de serviço viva do projeto, publicada como artifact em
+`https://claude.ai/code/artifact/51f63405-c8a9-46ef-b329-41bf587457f9`.
+
+**Regra acordada com o dono:** fez algo que está na lista → marca como feito. Algo mudou o plano → altera a lista. Sempre na fonte (`BASE` dentro do HTML), nunca só na conversa.
+
+**Mecânica:** toda mudança na `BASE` exige incrementar `VERSAO` (no mesmo arquivo) e republicar o artifact na mesma URL. Sem o incremento, o navegador do dono ignora a mudança. As marcações dele são preservadas por id na mesclagem. A sincronia é de mão única — o que ele marca no navegador não volta sozinho; ele avisa no chat ou exporta o JSON.
 
 ---
 
