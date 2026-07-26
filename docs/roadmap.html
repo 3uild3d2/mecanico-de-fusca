@@ -1,0 +1,1347 @@
+<title>Ordem de Serviço — Mecânico de Fusca</title>
+
+<style>
+  /* ---------------------------------------------------------------
+     Paleta herdada do app (src/styles.css): papel quente, aço azulado
+     e âmbar de sinalização. A tarja diagonal vem do mockup da garagem
+     em references/perfil-veiculo.html.
+     --------------------------------------------------------------- */
+  :root {
+    --papel: #f5f1e6;
+    --papel-alto: #fffdf7;
+    --papel-fundo: #ebe5d4;
+    --aco: #2a323a;
+    --aco-fundo: #1b2024;
+    --aco-claro: #3a444e;
+    --tinta: #2b3138;
+    --tinta-fraca: #6d7680;
+    --ambar: #d8862c;
+    --ambar-claro: #e8a04d;
+    --azul-vw: #4a7c93;
+    --feito: #5b8c6e;
+    --travado: #b8503c;
+
+    --ground: var(--papel);
+    --surface: var(--papel-alto);
+    --sunken: var(--papel-fundo);
+    --ink: var(--tinta);
+    --ink-soft: var(--tinta-fraca);
+    --rule: #d6cfba;
+    --accent: var(--ambar);
+    --accent-ink: #6b3f0c;
+    --bar: var(--aco);
+    --bar-ink: #ece5d5;
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    --shadow: 0 1px 2px rgb(27 32 36 / 0.06), 0 4px 12px rgb(27 32 36 / 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: var(--aco-fundo);
+      --surface: var(--aco);
+      --sunken: #232a31;
+      --ink: #e6e0d1;
+      --ink-soft: #8d968f;
+      --rule: #3c454e;
+      --accent: var(--ambar-claro);
+      --accent-ink: #1b2024;
+      --bar: #131719;
+      --bar-ink: #e6e0d1;
+      --feito: #74a389;
+      --travado: #d0705c;
+      --azul-vw: #6d9fb6;
+      --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.25);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: var(--aco-fundo);
+    --surface: var(--aco);
+    --sunken: #232a31;
+    --ink: #e6e0d1;
+    --ink-soft: #8d968f;
+    --rule: #3c454e;
+    --accent: var(--ambar-claro);
+    --accent-ink: #1b2024;
+    --bar: #131719;
+    --bar-ink: #e6e0d1;
+    --feito: #74a389;
+    --travado: #d0705c;
+    --azul-vw: #6d9fb6;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.25);
+  }
+
+  :root[data-theme="light"] {
+    --ground: var(--papel);
+    --surface: var(--papel-alto);
+    --sunken: var(--papel-fundo);
+    --ink: var(--tinta);
+    --ink-soft: var(--tinta-fraca);
+    --rule: #d6cfba;
+    --accent: var(--ambar);
+    --accent-ink: #6b3f0c;
+    --bar: var(--aco);
+    --bar-ink: #ece5d5;
+    --feito: #5b8c6e;
+    --travado: #b8503c;
+    --azul-vw: #4a7c93;
+    --shadow: 0 1px 2px rgb(27 32 36 / 0.06), 0 4px 12px rgb(27 32 36 / 0.05);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 20px 96px;
+  }
+
+  /* --- Cabeçalho ------------------------------------------------ */
+
+  .tarja {
+    height: 10px;
+    background: repeating-linear-gradient(45deg, var(--aco-fundo) 0 10px, var(--ambar) 10px 20px);
+  }
+
+  header {
+    background: var(--bar);
+    color: var(--bar-ink);
+    padding: 28px 0 24px;
+  }
+
+  .header-in {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 20px;
+    justify-content: space-between;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ambar-claro);
+    margin: 0 0 6px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 40px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    text-wrap: balance;
+  }
+
+  .sub {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: #a8b0a9;
+    max-width: 52ch;
+  }
+
+  /* --- Placar --------------------------------------------------- */
+
+  .placar {
+    display: flex;
+    gap: 26px;
+    flex-wrap: wrap;
+  }
+
+  .metrica .n {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    display: block;
+  }
+
+  .metrica .r {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #98a19a;
+    display: block;
+    margin-top: 6px;
+  }
+
+  .metrica.feito .n {
+    color: var(--feito);
+  }
+  .metrica.travado .n {
+    color: var(--travado);
+  }
+
+  /* --- Barra de ferramentas ------------------------------------- */
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: color-mix(in srgb, var(--ground) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 28px;
+  }
+
+  .toolbar-in {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .filtros {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 11px;
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+
+  .espaco {
+    flex: 1;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 11px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-soft);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
+  /* --- Barra de progresso --------------------------------------- */
+
+  .trilho {
+    height: 6px;
+    background: var(--sunken);
+    border-radius: 99px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .trilho > i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* --- Fase ----------------------------------------------------- */
+
+  .fase {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    margin-bottom: 22px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .fase-topo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--sunken);
+    border-bottom: 1px solid var(--rule);
+    flex-wrap: wrap;
+  }
+
+  .codigo {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 4px 8px;
+    background: var(--bar);
+    color: var(--ambar-claro);
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .fase h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .fase-nota {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+    max-width: 68ch;
+  }
+
+  .contagem {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .fase .trilho {
+    width: 100px;
+  }
+
+  /* --- Tarefa --------------------------------------------------- */
+
+  ul.tarefas {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li.tarefa {
+    display: grid;
+    grid-template-columns: 22px 22px 1fr auto;
+    gap: 10px;
+    align-items: start;
+    padding: 11px 18px 11px 10px;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+  }
+
+  li.tarefa:last-child {
+    border-bottom: 0;
+  }
+  li.tarefa:hover {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+
+  li.tarefa.arrastando {
+    opacity: 0.35;
+  }
+
+  li.tarefa.alvo::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: -1px;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .puxador {
+    cursor: grab;
+    color: var(--rule);
+    font-size: 15px;
+    line-height: 1.5;
+    text-align: center;
+    user-select: none;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .puxador:hover {
+    color: var(--accent);
+  }
+  .puxador:active {
+    cursor: grabbing;
+  }
+
+  .marca {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    border: 1.5px solid var(--rule);
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    color: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.12s;
+  }
+
+  .marca:hover {
+    border-color: var(--accent);
+  }
+
+  .corpo {
+    min-width: 0;
+  }
+
+  .titulo {
+    font-size: 14.5px;
+    line-height: 1.45;
+    outline: none;
+    border-radius: 2px;
+  }
+
+  .titulo:focus {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .nota {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+    line-height: 1.5;
+    outline: none;
+    border-radius: 2px;
+    max-width: 74ch;
+  }
+
+  .nota:focus {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .nota:empty::before {
+    content: "sem nota";
+    color: var(--rule);
+    font-style: italic;
+  }
+
+  .direita {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .selo {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+    border: 1px solid;
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .apagar {
+    background: none;
+    border: 0;
+    color: var(--rule);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  li.tarefa:hover .apagar,
+  .apagar:focus {
+    opacity: 1;
+  }
+  .apagar:hover {
+    color: var(--travado);
+  }
+
+  /* estados */
+  li[data-status="pendente"] .selo {
+    color: var(--ink-soft);
+    border-color: var(--rule);
+  }
+  li[data-status="fazendo"] .selo {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    background: var(--accent);
+    font-weight: 700;
+  }
+  li[data-status="travado"] .selo {
+    color: var(--travado);
+    border-color: var(--travado);
+  }
+  li[data-status="feito"] .selo {
+    color: var(--feito);
+    border-color: var(--feito);
+  }
+
+  li[data-status="feito"] .titulo {
+    text-decoration: line-through;
+    color: var(--ink-soft);
+  }
+  li[data-status="feito"] {
+    background: color-mix(in srgb, var(--feito) 7%, transparent);
+  }
+  li[data-status="feito"] .marca {
+    background: var(--feito);
+    border-color: var(--feito);
+    color: #fff;
+  }
+
+  li[data-status="travado"] {
+    border-inline-start: 3px solid var(--travado);
+    padding-inline-start: 7px;
+  }
+  li[data-status="fazendo"] {
+    border-inline-start: 3px solid var(--accent);
+    padding-inline-start: 7px;
+  }
+
+  .add {
+    display: block;
+    width: 100%;
+    text-align: start;
+    padding: 10px 18px 10px 52px;
+    background: none;
+    border: 0;
+    border-top: 1px dashed var(--rule);
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .add:hover {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+
+  .vazio {
+    padding: 22px 18px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* --- Rodapé --------------------------------------------------- */
+
+  footer {
+    border-top: 1px solid var(--rule);
+    margin-top: 40px;
+    padding-top: 18px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    max-width: 70ch;
+  }
+
+  footer code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--sunken);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .aviso {
+    margin: 0 0 22px;
+    padding: 11px 14px;
+    border: 1px solid var(--accent);
+    border-inline-start-width: 3px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    font-size: 13px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+  @media (max-width: 640px) {
+    li.tarefa {
+      grid-template-columns: 20px 20px 1fr;
+    }
+    .direita {
+      grid-column: 3;
+      margin-top: 4px;
+    }
+    .placar {
+      gap: 18px;
+    }
+  }
+</style>
+
+<div class="tarja"></div>
+
+<header>
+  <div class="header-in">
+    <div>
+      <p class="eyebrow">Ordem de serviço · até a publicação</p>
+      <h1>Mecânico de&nbsp;Fusca</h1>
+      <p class="sub">
+        Tudo que falta para o app chegar à Play Store. Arraste para reordenar, clique no texto para
+        editar, use o quadrado para concluir.
+      </p>
+    </div>
+    <div class="placar" id="placar"></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="toolbar-in">
+    <div class="filtros" id="filtros">
+      <button class="chip" data-f="todos" aria-pressed="true">Todos</button>
+      <button class="chip" data-f="aberto" aria-pressed="false">Em aberto</button>
+      <button class="chip" data-f="fazendo" aria-pressed="false">Fazendo</button>
+      <button class="chip" data-f="travado" aria-pressed="false">Bloqueantes</button>
+      <button class="chip" data-f="feito" aria-pressed="false">Concluídos</button>
+    </div>
+    <span class="espaco"></span>
+    <button class="btn" id="exportar">Exportar</button>
+    <button class="btn" id="importar">Importar</button>
+    <button class="btn" id="zerar">Restaurar</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <main id="fases"></main>
+
+  <footer>
+    <p>
+      O estado fica salvo neste navegador. <strong>Exportar</strong> baixa um <code>.json</code> que
+      você pode me devolver para eu retomar de onde você parou — ou usar como backup antes de trocar
+      de máquina.
+    </p>
+    <p>
+      As fases 2 a 5 estão numeradas porque a ordem é real: o RAG precisa do Postgres, o Capacitor
+      só faz sentido depois do produto validado na web, e o billing por último. Dívida e lançamento
+      não são sequência — são listas.
+    </p>
+  </footer>
+</div>
+
+<script>
+  const CHAVE = "fusca-roadmap-v1";
+
+  /* Incremente a cada alteração da lista abaixo. Ao abrir, a página compara
+     esta versão com a que está salva no navegador: se a publicada for mais
+     nova, a estrutura e os textos daqui passam a valer, mas as marcações do
+     usuário são preservadas por id — e as tarefas que ele criou continuam lá.
+     É isso que permite os dois lados manterem a mesma lista. */
+  const VERSAO = 7;
+
+  const BASE = [
+    {
+      id: "f2",
+      codigo: "FASE 2",
+      nome: "Migração para Supabase",
+      nota: "Troca a fundação. Sem usuários reais, não precisa de script de migração de dados — o schema pode ser desenhado do jeito certo.",
+      tarefas: [
+        {
+          t: "Confirmar a região do projeto Supabase",
+          n: "Confirmada como São Paulo em 26/07/2026.",
+          s: "feito",
+        },
+        {
+          t: "Escrever as migrations com schema e RLS",
+          n: "10 tabelas, RLS em todas, busca híbrida por Reciprocal Rank Fusion. Em supabase/migrations.",
+          s: "feito",
+        },
+        {
+          t: "Aplicar as migrations e validar contra o banco",
+          n: "Migrations 1 a 5 aplicadas em 26/07/2026 pelo SQL Editor, via supabase/aplicar-tudo.sql.",
+          s: "feito",
+        },
+        {
+          t: "Aplicar migrations 6 e 7 (id de mensagem e bucket de anexos)",
+          n: "Aplicadas em 26/07/2026. A primeira tentativa falhou (FK de attachments impedia mudar o tipo de um lado só); corrigida e reaplicada.",
+          s: "feito",
+        },
+        {
+          t: "Testar as políticas de RLS com dois usuários",
+          n: "Testadas em 26/07/2026 com dois usuários anônimos reais: isolamento entre usuários, bloqueio de is_admin e de subscriptions confirmados.",
+          s: "feito",
+        },
+        {
+          t: "Auth anônimo e Google no Supabase",
+          n: "Providers ligados e código escrito (supabase-auth.ts, com linkIdentity preservando o histórico). Falta trocar os componentes e testar o login de ponta a ponta. No Android, o atrito conhecido é signInWithIdToken com o plugin nativo.",
+          s: "fazendo",
+        },
+        {
+          t: "Migrar threads, vehicles, events e auth",
+          n: "Trocar os três stores manuais de useSyncExternalStore por TanStack Query, que já é dependência e está sem uso.",
+          s: "pendente",
+        },
+        {
+          t: "messages como tabela, uma linha por mensagem",
+          n: "Resolve a reescrita do documento inteiro a cada 600ms durante o streaming.",
+          s: "pendente",
+        },
+        {
+          t: "Storage e política de retenção dos anexos",
+          n: "Bucket 'anexos' criado na migration 7 (leitura pública, escrita só na pasta do dono). Falta a rotina que apaga os expirados: o Supabase não tem lifecycle rule como o Firebase — precisa de pg_cron ou job externo lendo attachments.expira_em.",
+          s: "pendente",
+        },
+        {
+          t: "Exclusão de conta, in-app e por URL pública",
+          n: "Requisito do Google Play. Precisa limpar Postgres e Storage numa operação só.",
+          s: "travado",
+        },
+      ],
+    },
+    {
+      id: "f3",
+      codigo: "FASE 3",
+      nome: "RAG — a base de conhecimento",
+      nota: "Movida para antes do Capacitor. Hoje o produto é Gemini com um prompt: replicável em uma tarde. O acervo é o fosso — e iterar recuperação na web é ciclo de segundos, dentro de um APK é de minutos.",
+      tarefas: [
+        {
+          t: "Definir a origem e a licença do conteúdo",
+          n: "Manual técnico protegido dentro de produto pago é exposição real. Caminhos limpos: material próprio, domínio público, fóruns com licença permissiva, ou licenciamento direto.",
+          s: "travado",
+        },
+        {
+          t: "Escrever um tópico piloto ponta a ponta",
+          n: "Valida formato, profundidade e metadados antes de produzir em escala. Markdown com front matter em content/.",
+          s: "pendente",
+        },
+        {
+          t: "Montar o acervo por sistema",
+          n: "Motor e carburação primeiro — é o que mais aparece. Depois elétrica, freios, suspensão e câmbio.",
+          s: "pendente",
+        },
+        {
+          t: "Revisão humana do conteúdo técnico",
+          n: "Os campos confianca e revisado_por existem para manter fora de produção o que não passou por você. Torque errado quebra motor.",
+          s: "pendente",
+        },
+        {
+          t: "Pipeline de ingestão",
+          n: "Chunking por estrutura (não por tamanho fixo), embeddings gemini-embedding-001 a 768 dimensões, metadados de aplicabilidade.",
+          s: "pendente",
+        },
+        {
+          t: "Busca híbrida: vetorial e full-text português",
+          n: "Vetorial sozinha erra em código de peça e valor numérico — 'Solex 30 PICT', 'folga 0,15mm' — onde o full-text acerta.",
+          s: "pendente",
+        },
+        {
+          t: "Filtrar por aplicabilidade cruzando com a ficha",
+          n: "Impede devolver especificação de 1600 a álcool para quem tem 1300 a gasolina. É o diferencial da Minha Garagem.",
+          s: "pendente",
+        },
+        {
+          t: "Prompt cita fonte e admite lacuna",
+          n: "Em vez de preencher o vazio com número inventado.",
+          s: "pendente",
+        },
+        {
+          t: "Validar na web antes de empacotar",
+          n: "Descobrir que a estratégia de busca está ruim tem que acontecer aqui, não depois do APK.",
+          s: "pendente",
+        },
+      ],
+    },
+    {
+      id: "f4",
+      codigo: "FASE 4",
+      nome: "Capacitor — o app Android",
+      nota: "Não existe Node dentro do celular: o app vira bundle estático e a API precisa estar remota, em URL fixa.",
+      tarefas: [
+        {
+          t: "Separar build SPA (app) de SSR (web)",
+          n: "O bundle do APK não pode depender de renderização no servidor.",
+          s: "pendente",
+        },
+        {
+          t: "URL da API por variável de ambiente",
+          n: "O app empacotado aponta para o servidor remoto, não para localhost.",
+          s: "pendente",
+        },
+        {
+          t: "capacitor init e plugins nativos",
+          n: "Push, câmera, filesystem e billing.",
+          s: "pendente",
+        },
+        {
+          t: "Google Sign-In nativo",
+          n: "O fluxo de popup do navegador não funciona dentro do WebView.",
+          s: "pendente",
+        },
+        {
+          t: "Ícones, splash, permissões e target SDK",
+          n: "O Google Play exige nível de API mínimo, que sobe todo ano.",
+          s: "pendente",
+        },
+        {
+          t: "Testar em aparelho real",
+          n: "Áudio, câmera e teclado se comportam diferente do navegador desktop.",
+          s: "pendente",
+        },
+      ],
+    },
+    {
+      id: "f5",
+      codigo: "FASE 5",
+      nome: "Monetização",
+      nota: "Assinatura mensal. Tudo aqui depende de o servidor ser a autoridade — o cliente nunca escreve o próprio direito de acesso.",
+      tarefas: [
+        { t: "Integrar Google Play Billing", n: "", s: "pendente" },
+        {
+          t: "Validar recibo no servidor",
+          n: "Recibo validado no cliente é recibo forjável.",
+          s: "pendente",
+        },
+        {
+          t: "Entitlements escritos só pelo servidor",
+          n: "As regras já proíbem o cliente de escrever isAdmin e plan. Falta quem escreva do lado certo.",
+          s: "pendente",
+        },
+        {
+          t: "Quota e rate limiting por usuário",
+          n: "Protege a margem e a chave de API. Urgente a partir do momento em que o app for público.",
+          s: "pendente",
+        },
+        {
+          t: "Definir o free tier",
+          n: "Quantas mensagens antes de pedir assinatura, e o que fica de fora.",
+          s: "pendente",
+        },
+      ],
+    },
+    {
+      id: "div",
+      codigo: "DÍVIDA",
+      nome: "Pendências conhecidas",
+      nota: "Encontradas e deliberadamente adiadas. Não é esquecimento — está tudo em docs/CONTEXTO.md com o motivo.",
+      tarefas: [
+        {
+          t: "Aplicar as regras do Firestore no projeto",
+          n: "firebase deploy --only firestore:rules,storage. Até lá a correção do isAdmin está só no cliente e o Firestore aceita a escrita.",
+          s: "travado",
+        },
+        {
+          t: "Eval do raciocínio com ~20 casos",
+          n: "Os três bugs do painel foram achados por anedota, um de cada vez. Sem medição, a próxima regressão passa batido.",
+          s: "pendente",
+        },
+        {
+          t: "Tela do histórico do veículo",
+          n: "O agente registra e nada permite ver, editar ou apagar. removerEvento existe e não está ligada a nada — registro automático sem correção é armadilha.",
+          s: "pendente",
+        },
+        {
+          t: "Observabilidade",
+          n: "Só console.error hoje. Com usuário pagante, erro que ninguém vê não existe.",
+          s: "pendente",
+        },
+        {
+          t: "Projeto Firebase dedicado",
+          n: "Hoje é suporte-24h, nome herdado de outra finalidade. Renomear depois, com usuários dentro, custa migração.",
+          s: "pendente",
+        },
+        {
+          t: "Garantir a chamada de atualizarHipoteses",
+          n: "Hoje depende de o modelo obedecer o prompt. Se parar de chamar, o painel congela mostrando raciocínio velho.",
+          s: "pendente",
+        },
+        {
+          t: "Estado de carregamento no painel",
+          n: "Enquanto o modelo pensa, mostra o estado anterior sem sinalizar que está desatualizado.",
+          s: "pendente",
+        },
+        {
+          t: "Alinhar zod para a v4",
+          n: "O AI SDK v6 tende a v4. Não deu conflito porque usamos zod isolado.",
+          s: "pendente",
+        },
+        {
+          t: "Conferir as dimensões do logo",
+          n: "Os componentes declaram width e height 1024. Se o JPEG não for quadrado, há deslocamento de layout antes de carregar.",
+          s: "pendente",
+        },
+      ],
+    },
+    {
+      id: "lanc",
+      codigo: "LANÇAMENTO",
+      nome: "Requisitos de publicação",
+      nota: "Burocracia que bloqueia a revisão da loja. Nada aqui é código, e tudo aqui atrasa o lançamento se ficar para o fim.",
+      tarefas: [
+        {
+          t: "Política de privacidade publicada",
+          n: "Precisa de URL pública e estar declarada na ficha da loja.",
+          s: "pendente",
+        },
+        {
+          t: "Formulário de Data Safety",
+          n: "Declarar o que é coletado: conversas, áudio, imagens, dados do veículo.",
+          s: "pendente",
+        },
+        {
+          t: "Página pública de exclusão de conta",
+          n: "Acessível sem instalar o app. Anda junto com a tarefa de exclusão na Fase 2.",
+          s: "pendente",
+        },
+        {
+          t: "Ficha da loja: textos e capturas",
+          n: "Descrição, ícone e imagens em português do Brasil.",
+          s: "pendente",
+        },
+        {
+          t: "Teste fechado antes do aberto",
+          n: "O Google exige período de teste com testadores antes da publicação em produção.",
+          s: "pendente",
+        },
+      ],
+    },
+  ];
+
+  const ORDEM = ["pendente", "fazendo", "feito", "travado"];
+  const ROTULO = {
+    pendente: "Pendente",
+    fazendo: "Fazendo",
+    feito: "Feito",
+    travado: "Bloqueante",
+  };
+
+  let dados = carregar();
+  let filtro = "todos";
+
+  function semente() {
+    return BASE.map((f) => ({
+      id: f.id,
+      codigo: f.codigo,
+      nome: f.nome,
+      nota: f.nota,
+      tarefas: f.tarefas.map((t, i) => ({
+        id: f.id + "-" + i,
+        titulo: t.t,
+        nota: t.n,
+        status: t.s,
+      })),
+    }));
+  }
+
+  /* Estrutura e textos vêm da semente; status e tarefas próprias do usuário
+     vêm do que estava salvo. Casa por id — tarefa removida da semente some,
+     tarefa nova aparece, e nada do que ele marcou se perde. */
+  function mesclar(semeado, salvo) {
+    const statusPorId = new Map();
+    const criadasPorFase = new Map();
+
+    for (const fase of salvo) {
+      for (const t of fase.tarefas || []) {
+        statusPorId.set(t.id, t.status);
+        if (String(t.id).startsWith("n")) {
+          if (!criadasPorFase.has(fase.id)) criadasPorFase.set(fase.id, []);
+          criadasPorFase.get(fase.id).push(t);
+        }
+      }
+    }
+
+    return semeado.map((fase) => ({
+      ...fase,
+      tarefas: [
+        ...fase.tarefas.map((t) =>
+          statusPorId.has(t.id) ? { ...t, status: statusPorId.get(t.id) } : t,
+        ),
+        ...(criadasPorFase.get(fase.id) || []),
+      ],
+    }));
+  }
+
+  let listaAtualizada = false;
+
+  function carregar() {
+    try {
+      const cru = localStorage.getItem(CHAVE);
+      if (!cru) return semente();
+
+      const p = JSON.parse(cru);
+      const versaoSalva = p && typeof p === "object" ? p.versao || 1 : 1;
+      const fases = Array.isArray(p) ? p : p.fases;
+      if (!Array.isArray(fases) || !fases.length) return semente();
+
+      if (versaoSalva < VERSAO) {
+        listaAtualizada = true;
+        return mesclar(semente(), fases);
+      }
+      return fases;
+    } catch {
+      return semente();
+    }
+  }
+
+  function salvar() {
+    try {
+      localStorage.setItem(CHAVE, JSON.stringify({ versao: VERSAO, fases: dados }));
+    } catch {
+      /* modo privado: segue sem persistir */
+    }
+  }
+
+  function visivel(t) {
+    if (filtro === "todos") return true;
+    if (filtro === "aberto") return t.status !== "feito";
+    return t.status === filtro;
+  }
+
+  function render() {
+    const alvo = document.getElementById("fases");
+    alvo.textContent = "";
+
+    for (const fase of dados) {
+      const mostradas = fase.tarefas.filter(visivel);
+      const feitas = fase.tarefas.filter((t) => t.status === "feito").length;
+      const total = fase.tarefas.length;
+      const pct = total ? Math.round((feitas / total) * 100) : 0;
+
+      const sec = document.createElement("section");
+      sec.className = "fase";
+
+      const topo = document.createElement("div");
+      topo.className = "fase-topo";
+      topo.innerHTML =
+        '<span class="codigo"></span><h2></h2>' +
+        '<span class="contagem"></span>' +
+        '<div class="trilho"><i></i></div>' +
+        '<p class="fase-nota"></p>';
+      topo.querySelector(".codigo").textContent = fase.codigo;
+      topo.querySelector("h2").textContent = fase.nome;
+      topo.querySelector(".contagem").textContent = feitas + "/" + total;
+      topo.querySelector(".trilho > i").style.width = pct + "%";
+      topo.querySelector(".fase-nota").textContent = fase.nota;
+      sec.appendChild(topo);
+
+      const ul = document.createElement("ul");
+      ul.className = "tarefas";
+      ul.dataset.fase = fase.id;
+
+      if (!mostradas.length) {
+        const vazio = document.createElement("li");
+        vazio.className = "vazio";
+        vazio.textContent = total
+          ? "Nada nesta fase corresponde ao filtro."
+          : "Nenhuma tarefa aqui ainda.";
+        ul.appendChild(vazio);
+      }
+
+      for (const tarefa of mostradas) {
+        ul.appendChild(linha(tarefa, fase.id));
+      }
+
+      sec.appendChild(ul);
+
+      const add = document.createElement("button");
+      add.className = "add";
+      add.textContent = "+ nova tarefa";
+      add.addEventListener("click", () => {
+        fase.tarefas.push({
+          id: "n" + Date.now(),
+          titulo: "Nova tarefa",
+          nota: "",
+          status: "pendente",
+        });
+        salvar();
+        render();
+        const ultima = document.querySelector(
+          '[data-fase="' + fase.id + '"] li.tarefa:last-of-type .titulo',
+        );
+        if (ultima) {
+          ultima.focus();
+          getSelection().selectAllChildren(ultima);
+        }
+      });
+      sec.appendChild(add);
+
+      alvo.appendChild(sec);
+    }
+
+    placar();
+  }
+
+  function linha(tarefa, faseId) {
+    const li = document.createElement("li");
+    li.className = "tarefa";
+    li.dataset.status = tarefa.status;
+    li.dataset.id = tarefa.id;
+    li.dataset.fase = faseId;
+    li.draggable = true;
+
+    li.innerHTML =
+      '<button class="puxador" title="Arraste para reordenar" aria-label="Reordenar">⠿</button>' +
+      '<button class="marca" aria-label="Marcar como concluída">✓</button>' +
+      '<div class="corpo">' +
+      '<div class="titulo" contenteditable="plaintext-only" role="textbox" aria-label="Título"></div>' +
+      '<div class="nota" contenteditable="plaintext-only" role="textbox" aria-label="Nota"></div>' +
+      "</div>" +
+      '<div class="direita">' +
+      '<button class="selo" title="Clique para mudar o estado"></button>' +
+      '<button class="apagar" aria-label="Apagar tarefa">×</button>' +
+      "</div>";
+
+    const titulo = li.querySelector(".titulo");
+    const nota = li.querySelector(".nota");
+    titulo.textContent = tarefa.titulo;
+    nota.textContent = tarefa.nota;
+    li.querySelector(".selo").textContent = ROTULO[tarefa.status];
+
+    titulo.addEventListener("blur", () => {
+      tarefa.titulo = titulo.textContent.trim() || "Sem título";
+      titulo.textContent = tarefa.titulo;
+      salvar();
+      placar();
+    });
+
+    nota.addEventListener("blur", () => {
+      tarefa.nota = nota.textContent.trim();
+      salvar();
+    });
+
+    for (const campo of [titulo, nota]) {
+      campo.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          campo.blur();
+        }
+        if (e.key === "Escape") {
+          campo.blur();
+          render();
+        }
+      });
+    }
+
+    li.querySelector(".marca").addEventListener("click", () => {
+      tarefa.status = tarefa.status === "feito" ? "pendente" : "feito";
+      salvar();
+      render();
+    });
+
+    li.querySelector(".selo").addEventListener("click", () => {
+      const i = ORDEM.indexOf(tarefa.status);
+      tarefa.status = ORDEM[(i + 1) % ORDEM.length];
+      salvar();
+      render();
+    });
+
+    li.querySelector(".apagar").addEventListener("click", () => {
+      const fase = dados.find((f) => f.id === faseId);
+      fase.tarefas = fase.tarefas.filter((t) => t.id !== tarefa.id);
+      salvar();
+      render();
+    });
+
+    return li;
+  }
+
+  /* --- Arrastar e soltar ---------------------------------------- */
+
+  let arrastado = null;
+
+  document.addEventListener("dragstart", (e) => {
+    const li = e.target.closest("li.tarefa");
+    if (!li) return;
+    arrastado = li;
+    li.classList.add("arrastando");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", li.dataset.id);
+  });
+
+  document.addEventListener("dragend", () => {
+    if (arrastado) arrastado.classList.remove("arrastando");
+    document.querySelectorAll(".alvo").forEach((n) => n.classList.remove("alvo"));
+    arrastado = null;
+  });
+
+  document.addEventListener("dragover", (e) => {
+    if (!arrastado) return;
+    const li = e.target.closest("li.tarefa");
+    const ul = e.target.closest("ul.tarefas");
+    if (!ul) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".alvo").forEach((n) => n.classList.remove("alvo"));
+    if (li && li !== arrastado) li.classList.add("alvo");
+  });
+
+  document.addEventListener("drop", (e) => {
+    if (!arrastado) return;
+    const ul = e.target.closest("ul.tarefas");
+    if (!ul) return;
+    e.preventDefault();
+
+    const idOrigem = arrastado.dataset.id;
+    const faseOrigem = dados.find((f) => f.id === arrastado.dataset.fase);
+    const faseDestino = dados.find((f) => f.id === ul.dataset.fase);
+    if (!faseOrigem || !faseDestino) return;
+
+    const idx = faseOrigem.tarefas.findIndex((t) => t.id === idOrigem);
+    if (idx === -1) return;
+    const [movida] = faseOrigem.tarefas.splice(idx, 1);
+
+    const alvoLi = e.target.closest("li.tarefa");
+    let destino = faseDestino.tarefas.length;
+    if (alvoLi && alvoLi.dataset.id !== idOrigem) {
+      const j = faseDestino.tarefas.findIndex((t) => t.id === alvoLi.dataset.id);
+      if (j !== -1) destino = j;
+    }
+
+    faseDestino.tarefas.splice(destino, 0, movida);
+    salvar();
+    render();
+  });
+
+  /* --- Placar --------------------------------------------------- */
+
+  function placar() {
+    const todas = dados.flatMap((f) => f.tarefas);
+    const feitas = todas.filter((t) => t.status === "feito").length;
+    const travadas = todas.filter((t) => t.status === "travado").length;
+    const fazendo = todas.filter((t) => t.status === "fazendo").length;
+    const pct = todas.length ? Math.round((feitas / todas.length) * 100) : 0;
+
+    const el = document.getElementById("placar");
+    el.textContent = "";
+
+    const linhas = [
+      { n: pct + "%", r: "concluído", c: "feito" },
+      { n: feitas + "/" + todas.length, r: "tarefas", c: "" },
+      { n: fazendo, r: "em curso", c: "" },
+      { n: travadas, r: "bloqueantes", c: "travado" },
+    ];
+
+    for (const m of linhas) {
+      const d = document.createElement("div");
+      d.className = "metrica " + m.c;
+      d.innerHTML = '<span class="n"></span><span class="r"></span>';
+      d.querySelector(".n").textContent = m.n;
+      d.querySelector(".r").textContent = m.r;
+      el.appendChild(d);
+    }
+  }
+
+  /* --- Barra de ferramentas ------------------------------------- */
+
+  document.getElementById("filtros").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    filtro = b.dataset.f;
+    document.querySelectorAll("#filtros .chip").forEach((c) => {
+      c.setAttribute("aria-pressed", String(c === b));
+    });
+    render();
+  });
+
+  document.getElementById("exportar").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "roadmap-fusca.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("importar").addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", () => {
+      const arquivo = input.files && input.files[0];
+      if (!arquivo) return;
+      const leitor = new FileReader();
+      leitor.onload = () => {
+        try {
+          const p = JSON.parse(String(leitor.result));
+          if (!Array.isArray(p) || !p.length) throw new Error("formato");
+          dados = p;
+          salvar();
+          render();
+        } catch {
+          alert("Arquivo inválido. Use um .json exportado por esta mesma página.");
+        }
+      };
+      leitor.readAsText(arquivo);
+    });
+    input.click();
+  });
+
+  if (listaAtualizada) {
+    salvar();
+    const aviso = document.createElement("div");
+    aviso.className = "aviso";
+    aviso.textContent =
+      "A lista foi atualizada no repositório. Suas marcações e tarefas próprias foram mantidas.";
+    document.querySelector(".wrap").prepend(aviso);
+  }
+
+  document.getElementById("zerar").addEventListener("click", () => {
+    if (!confirm("Restaurar a lista original? Suas edições e marcações serão perdidas.")) return;
+    dados = semente();
+    salvar();
+    render();
+  });
+
+  render();
+</script>
