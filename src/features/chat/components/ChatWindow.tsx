@@ -1,5 +1,10 @@
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type FileUIPart,
+  type UIMessage,
+} from "ai";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageIcon, Mic, Paperclip, Square, Wrench, X } from "lucide-react";
@@ -24,8 +29,11 @@ import {
 import { Shimmer } from "@/features/chat/components/shimmer";
 import { uploadChatFiles } from "@/features/chat/attachments";
 import { getThread, saveThreadMessages, useThread } from "@/features/chat/api";
+import { extractEstadoDiagnostico, type EstadoDiagnostico } from "@/features/chat/hipoteses";
 import { useActiveVehicle } from "@/features/garage/api";
-import fuscaLogo from "@/assets/fusca-logo.png";
+import { registrarEvento, useVehicleEvents } from "@/features/garage/events-api";
+import type { VehicleEvent } from "@/features/garage/events";
+import fuscaLogo from "@/assets/fusca-logo.jpg";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
@@ -38,6 +46,17 @@ const SUGGESTIONS = [
 
 const ACCEPTED_MEDIA = "image/*,audio/*";
 const MAX_ATTACHMENT_SIZE = 15 * 1024 * 1024;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Espelha o inputSchema de registrarEvento em src/server/ai/tools.ts. */
+type RegistrarEventoInput = {
+  tipo: VehicleEvent["tipo"];
+  titulo: string;
+  sistema?: VehicleEvent["sistema"];
+  desfecho?: VehicleEvent["desfecho"];
+  diasAtras?: number;
+  km?: number;
+};
 
 type SubmitFile = FileUIPart & { sourceFile?: File };
 
@@ -240,16 +259,73 @@ function AttachFileButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export function ChatWindow({ threadId }: { threadId: string }) {
+export function ChatWindow({
+  threadId,
+  onEstadoChange,
+}: {
+  threadId: string;
+  onEstadoChange?: (estado: EstadoDiagnostico | null) => void;
+}) {
   useThread(threadId);
   const initial = getThread(threadId);
   const activeVehicle = useActiveVehicle();
+  const vehicleEvents = useVehicleEvents();
   const composerRef = useRef<HTMLDivElement | null>(null);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, addToolResult } = useChat({
     id: threadId,
     messages: initial?.messages ?? [],
     transport,
+    // Sem isto, o fluxo trava: o resultado da ferramenta é gravado na mensagem e
+    // nada reenvia ao servidor, então o modelo nunca continua a resposta. O
+    // sintoma é uma bolha de assistente vazia e um único POST em /api/chat.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    // Ferramentas de cliente: o agente decide, o navegador executa — é aqui que
+    // existe a sessão autenticada do Firestore.
+    onToolCall: async ({ toolCall }) => {
+      // atualizarHipoteses não tem efeito colateral: o estado é derivado das
+      // partes da mensagem. Só precisa devolver resultado para o SDK seguir.
+      if (toolCall.toolName === "atualizarHipoteses") {
+        addToolResult({
+          tool: "atualizarHipoteses",
+          toolCallId: toolCall.toolCallId,
+          output: { ok: true },
+        });
+        return;
+      }
+
+      if (toolCall.toolName !== "registrarEvento") return;
+
+      const input = toolCall.input as RegistrarEventoInput;
+      try {
+        const evento = await registrarEvento({
+          tipo: input.tipo,
+          titulo: input.titulo,
+          sistema: input.sistema,
+          desfecho: input.desfecho,
+          km: input.km,
+          data: Date.now() - (input.diasAtras ?? 0) * DIA_MS,
+          threadId,
+          origem: "agente",
+        });
+
+        toast.success(`Registrado: ${evento.titulo}`);
+        addToolResult({
+          tool: "registrarEvento",
+          toolCallId: toolCall.toolCallId,
+          output: { ok: true, id: evento.id },
+        });
+      } catch (error) {
+        addToolResult({
+          tool: "registrarEvento",
+          toolCallId: toolCall.toolCallId,
+          output: {
+            ok: false,
+            erro: error instanceof Error ? error.message : "Falha ao registrar",
+          },
+        });
+      }
+    },
     onError: (error) => {
       toast.error(
         error.message?.includes("402")
@@ -265,7 +341,7 @@ export function ChatWindow({ threadId }: { threadId: string }) {
 
   // A ficha do veículo vai como body por requisição. Antes estava em useChat({ body }),
   // que o AI SDK v6 ignora — o perfil do carro nunca chegava ao modelo.
-  const requestOptions = { body: { vehicle: activeVehicle } };
+  const requestOptions = { body: { vehicle: activeVehicle, events: vehicleEvents } };
 
   // Persist messages for this thread whenever they change.
   useEffect(() => {
@@ -273,6 +349,12 @@ export function ChatWindow({ threadId }: { threadId: string }) {
       saveThreadMessages(threadId, messages);
     }
   }, [messages, threadId]);
+
+  // O estado do raciocínio é derivado das mensagens, então acompanha o streaming
+  // sem armazenamento próprio. Sobe para o ChatApp, que é quem monta o painel.
+  useEffect(() => {
+    onEstadoChange?.(extractEstadoDiagnostico(messages));
+  }, [messages, onEstadoChange]);
 
   // Keep the composer focused for fast back-and-forth.
   useEffect(() => {

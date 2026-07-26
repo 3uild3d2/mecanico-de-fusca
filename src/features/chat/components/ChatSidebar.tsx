@@ -26,7 +26,7 @@ import {
 import { signInWithGoogle, signOutToAnonymous, useAuthUser } from "@/features/auth/api";
 import { useIsAdmin } from "@/features/auth/entitlements";
 import { VehicleProfileDialog } from "@/features/garage/components/VehicleProfileDialog";
-import fuscaLogo from "@/assets/fusca-logo.png";
+import fuscaLogo from "@/assets/fusca-logo.jpg";
 
 export function ChatSidebar({
   activeThreadId,

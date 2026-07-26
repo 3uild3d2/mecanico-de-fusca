@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { createThread, getThreads, waitForThreadsReady } from "@/features/chat/api";
-import fuscaLogo from "@/assets/fusca-logo.png";
+import fuscaLogo from "@/assets/fusca-logo.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({

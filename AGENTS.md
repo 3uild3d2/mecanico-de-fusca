@@ -39,9 +39,10 @@ src/
 ├── features/           Domínios. Cada um dono do seu próprio código.
 │   ├── auth/           api.ts (sessão) · entitlements.ts (direitos, só leitura)
 │   ├── chat/           api.ts · model.ts · attachments.ts · components/
-│   └── garage/         api.ts · model.ts · components/
+│   └── garage/         api.ts · model.ts (ficha)
+│                       events.ts · events-api.ts (memória diagnóstica)
 ├── server/             NUNCA chega ao cliente. Protegido por vite.config.ts.
-│   ├── ai/             provider · prompt · messages · schema
+│   ├── ai/             provider · prompt · messages · schema · sistema · tools
 │   └── config/env.ts   segredos, validados na inicialização
 ├── shared/             Transversal, sem regra de negócio.
 │   ├── config/env.ts   variáveis VITE_* (públicas)
@@ -63,6 +64,17 @@ src/
 | `server/**`   | segredos, chamadas ao modelo, entitlements  | qualquer coisa importada pelo cliente |
 
 **`model.ts` é onde mora o que tem teste.** Se algo está difícil de testar, provavelmente está na camada errada — mova para `model.ts` em vez de escrever mock.
+
+### Ferramentas do agente
+
+`registrarEvento` (`src/server/ai/tools.ts`) é definida **sem `execute`**. No AI SDK isso a torna ferramenta de _cliente_: o agente decide chamar, e quem grava é o navegador — em `onToolCall`, dentro de `ChatWindow.tsx`, onde existe a sessão autenticada do Firestore.
+
+Se for adicionar ferramenta nova, decida conscientemente de que lado ela roda:
+
+- **Servidor** (com `execute`) — quando precisar de segredo ou de dado que o cliente não deve ver.
+- **Cliente** (sem `execute`) — quando precisar da sessão do usuário. Evita dar credencial de administrador ao servidor.
+
+O `inputSchema` da ferramenta e o tipo correspondente no cliente precisam andar juntos; hoje isso é manual e não há nada que force o alinhamento.
 
 ### Cuidado com o nome `server`
 
@@ -86,6 +98,10 @@ Existem duas coisas parecidas e diferentes:
 5. **Peso é conversão.** Em APK, cada MB viaja no aparelho do usuário. Antes de adicionar dependência, rode `npm run build` e olhe o tamanho de `.output/public`. Hoje: ~2,3 MB. Se uma dependência dobrar isso, ela precisa justificar muito bem.
 
 6. **Uma fase, um app funcionando.** Nada de big bang. Ver o roteiro em `docs/ARCHITECTURE.md` §5.
+
+7. **O prompt é código.** `src/server/ai/prompt.ts` carrega o método de diagnóstico — é o que separa este produto de um chatbot genérico. Mexa nele com o mesmo cuidado de qualquer outro código: revisão, `PROMPT_VERSION` incrementada, e ciente de que não há eval automatizado ainda (ver pendências em `docs/CONTEXTO.md`).
+
+8. **Não invente número.** Torque, folga e ponto errados quebram motor ou machucam alguém. O prompt instrui o agente a dar faixa e mandar conferir quando não tem certeza — não afrouxe isso, e aplique o mesmo critério ao conteúdo que você escrever para o RAG.
 
 ---
 

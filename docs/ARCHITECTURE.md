@@ -48,22 +48,22 @@ Organização **por domínio**, não por tipo de arquivo. Hoje `lib/` é um saco
 
 ```
 ├── android/                    # gerado pelo Capacitor, commitado
+├── content/                    # acervo do RAG: markdown + front matter
 ├── supabase/
 │   ├── migrations/             # schema + RLS versionados = fonte da verdade
-│   └── seed/                   # conteúdo base do RAG
+│   └── seed/
 ├── src/
-│   ├── app/                    # router, root route, providers
 │   ├── features/
-│   │   ├── chat/               # components/ hooks/ api.ts model.ts
-│   │   ├── garage/             # ficha do veículo
-│   │   ├── auth/
-│   │   └── billing/
+│   │   ├── auth/               # api.ts · entitlements.ts
+│   │   ├── chat/               # api.ts · model.ts · attachments.ts · components/
+│   │   ├── garage/             # api.ts · model.ts · events.ts · events-api.ts
+│   │   └── billing/            # (Fase 5)
 │   ├── server/                 # NUNCA vai pro cliente
-│   │   ├── ai/                 # prompt.ts · rag.ts · provider.ts
-│   │   ├── billing/            # validação de recibo Play
-│   │   ├── quota.ts
-│   │   └── db.ts               # client service-role
-│   ├── shared/                 # ui/ · utils · tipos comuns
+│   │   ├── ai/                 # provider · prompt · messages · schema · sistema · tools · rag
+│   │   ├── billing/            # validação de recibo Play (Fase 5)
+│   │   ├── quota.ts            # (Fase 5)
+│   │   └── config/env.ts
+│   ├── shared/                 # config/ · lib/ · hooks/ · ui/
 │   └── routes/                 # fino: só compõe features
 └── docs/
 ```
@@ -151,9 +151,11 @@ Só `console.error`. Com usuários pagantes, erro que ninguém vê é erro que n
 Esboço inicial — detalhar nas migrations.
 
 ```sql
-profiles        (id → auth.users, display_name, is_admin, created_at)
+profiles        (id → auth.users, display_name, is_admin, plan, created_at)
 vehicles        (id, user_id, apelido, modelo, ano, motor, carburacao,
                  combustivel, ignicao, sistema_eletrico, modificacoes, is_active)
+vehicle_events  (id, vehicle_id, user_id, tipo, titulo, sistema, desfecho,
+                 data_evento, km, thread_id, origem, created_at)
 threads         (id, user_id, title, title_edited, created_at, updated_at)
 messages        (id, thread_id, role, parts jsonb, created_at)
 attachments     (id, message_id, storage_path, media_type, expires_at)
@@ -161,16 +163,22 @@ subscriptions   (user_id, plan, status, play_purchase_token,
                  current_period_end, updated_at)     -- só o servidor escreve
 usage_events    (id, user_id, kind, tokens, created_at)  -- quota e custo
 
-documents       (id, source, title, content, metadata jsonb)
-chunks          (id, document_id, content, embedding vector(768), tokens)
+documents       (id, fonte, titulo, conteudo, aplicabilidade jsonb,
+                 confianca, revisado_por, atualizado_em)
+chunks          (id, document_id, conteudo, embedding vector(768),
+                 aplicabilidade jsonb, busca tsvector, tokens)
 ```
 
 **Regras:**
 
 - RLS ligada em todas as tabelas desde a primeira migration. Sem exceção.
 - `vehicles` já é plural — a "Minha Garagem" comporta vários carros (o mockup em `references/perfil-veiculo.html` já previa isso).
-- `subscriptions` e `is_admin`: `SELECT` para o dono, `UPDATE`/`INSERT` só via `service_role`.
-- Índice HNSW em `chunks.embedding`; busca híbrida (vetorial + full-text português) via função `RPC`.
+- `vehicle_events` é a memória diagnóstica descrita em `docs/CONTEXTO.md`. Hoje vive no Firestore (`users/{uid}/vehicleEvents`); a lógica pura em `features/garage/events.ts` é portável e só a camada de I/O é reescrita.
+- `subscriptions`, `is_admin` e `plan`: `SELECT` para o dono, escrita só pelo servidor.
+- Índice HNSW em `chunks.embedding` (768 dimensões, `gemini-embedding-001`). A dimensão é irreversível sem reprocessar o acervo.
+- `chunks.busca` é `tsvector` com dicionário português: busca híbrida via função `RPC`. Vetorial sozinha erra em código de peça e valor numérico — "Solex 30 PICT", "folga 0,15mm" — onde o full-text acerta.
+- `aplicabilidade` filtra por motor, ano e combustível **antes** de ranquear, cruzando com a ficha do veículo. É o que impede devolver especificação de 1600 a álcool para um 1300 a gasolina.
+- `confianca` e `revisado_por` permitem manter fora de produção o conteúdo que ainda não passou por revisão humana. Num app onde torque errado quebra motor, isso não é opcional.
 
 ---
 
@@ -187,28 +195,39 @@ Cada fase deixa o app funcionando. Nada de big bang.
 - ✅ Reorganização para a estrutura da seção 2
 - ⏳ Observabilidade — adiada para antes do lançamento (§3.9)
 
+### Fase 1.5 — Raciocínio do agente ✅ _(concluída em 2026-07-25)_
+
+- ✅ Método de diagnóstico com triagem e laço orientador (`server/ai/prompt.ts`)
+- ✅ Falseamento como regra operacional
+- ✅ Memória diagnóstica do carro (`features/garage/events.ts`)
+- ✅ _Tool calling_ com `registrarEvento` como ferramenta de cliente
+- ✅ Painel de raciocínio (`features/chat/hipoteses.ts` + `HypothesisPanel.tsx`), com o estado derivado das mensagens em vez de armazenamento próprio
+- ⏳ Eval do raciocínio e UI do histórico — ver pendências em `docs/CONTEXTO.md`
+
 ### Fase 2 — Migração para Supabase
 
-- Migrations com schema + RLS
+- Migrations com schema + RLS, incluindo `vehicle_events`
 - Auth anônimo + Google (no Android, `signInWithIdToken` com o plugin nativo — é o ponto de atrito conhecido)
-- Reescrever `threads` / `vehicles` / `auth` sobre o Supabase, usando **TanStack Query** (já é dependência e hoje não é usada; substitui os singletons de `useSyncExternalStore` escritos à mão)
+- Reescrever `threads` / `vehicles` / `events` / `auth` sobre o Supabase, usando **TanStack Query** (já é dependência e hoje não é usada; substitui os singletons de `useSyncExternalStore` escritos à mão)
 - Storage + política de retenção dos anexos
-- Script de migração dos dados dos usuários atuais
 - Exclusão de conta (seção 3.3)
+- Sem script de migração de dados: o app nunca esteve no ar com usuários reais
 
-### Fase 3 — Capacitor
+### Fase 3 — RAG (pgvector)
+
+**Movida para antes do Capacitor.** O motivo: hoje o produto é o Gemini com um prompt — replicável em uma tarde e insuficiente para sustentar assinatura. O acervo é o fosso. E iterar recuperação na web é ciclo de segundos; dentro de um APK, de minutos. Descobrir que a estratégia de busca está ruim deve acontecer antes do empacotamento, não depois.
+
+- Pipeline de ingestão a partir de `content/`: chunking por estrutura, embeddings, metadados de aplicabilidade
+- Busca híbrida (vetorial + full-text português) filtrada pela ficha do veículo
+- Prompt estendido para citar fonte e admitir quando não encontrou nada
+- Validação na web antes de empacotar
+
+### Fase 4 — Capacitor
 
 - Build SPA para o app, SSR para a web
 - URL da API por variável de ambiente
 - `capacitor init`, plugins: push, camera, filesystem, billing
 - Ícones, splash, permissões, target SDK
-
-### Fase 4 — RAG (pgvector)
-
-- Pipeline de ingestão: chunking + embeddings + metadados de fonte
-- Busca híbrida, com filtro pelo perfil do carro do usuário
-- Prompt reescrito para citar fontes e admitir quando não encontrou nada
-- Correção de 3.1 e 3.4 no mesmo passo (é o mesmo arquivo)
 
 ### Fase 5 — Monetização
 

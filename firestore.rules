@@ -38,6 +38,12 @@ service cloud.firestore {
       match /vehicle/{vehicleId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Histórico do carro. Escrito tanto pelo dono quanto pelo agente — mas
+      // sempre pelo navegador do próprio dono, com a sessão dele.
+      match /vehicleEvents/{eventId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Nada mais é acessível pelo cliente.

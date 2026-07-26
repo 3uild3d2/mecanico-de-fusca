@@ -8,16 +8,32 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 
 ## Onde o trabalho está
 
-**Fase atual:** Fase 1 (fundação de qualidade) — concluída em 2026-07-25.
+**Concluído:** Fase 1 (fundação de qualidade) e a evolução do raciocínio — método de diagnóstico, falseamento e memória do carro. Ambos em 2026-07-25.
 **Próxima:** Fase 2 (migração para Supabase). Ver `docs/ARCHITECTURE.md` §5.
 
-O app roda em Firebase (Auth anônimo + Google, Firestore, Storage) com API em TanStack Start/Nitro e Google AI Studio (`gemini-3-flash-preview`). Nada de Supabase, Capacitor ou billing ainda existe no código.
+O app roda em Firebase (Auth anônimo + Google, Firestore, Storage) com API em TanStack Start/Nitro e Google AI Studio (`gemini-3-flash-preview`), agora com _tool calling_. Capacitor, billing e RAG ainda não existem no código.
+
+**Projeto Firebase:** `suporte-24h` — nome herdado de outra finalidade, não do produto. Vale considerar um projeto dedicado antes do lançamento; renomear depois, com usuários dentro, custa migração.
+
+**Supabase:** projeto `ougesilqshtsgpnfmdaw` criado, ainda vazio. Usa a nomenclatura nova de chaves (`sb_publishable_` / `sb_secret_`) e não as legadas `anon` / `service_role`. Região a confirmar — o ideal é São Paulo, já que a API consulta o banco a cada mensagem.
+
+**Decisões do RAG já tomadas:** embeddings `gemini-embedding-001` a **768 dimensões** (mesma chave do Google AI Studio, sem fornecedor novo, forte em português). A dimensão fica gravada no schema — mudar depois obriga a reprocessar todo o acervo. Conteúdo será pesquisado e redigido em conjunto, em markdown com front matter dentro do repositório.
 
 ---
 
 ## Pendências conhecidas
 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
+
+- **Sem eval do raciocínio.** Mexer em prompt de diagnóstico sem medição é palpite, e regressão em raciocínio é invisível até um usuário reclamar. Falta um conjunto de ~20 casos com desfecho conhecido, rodado a cada mudança, medindo: chegou à conclusão certa? em quantos turnos? descartou hipótese por evidência ou por preferência? Os casos podem sair do próprio acervo do RAG.
+
+- **Nenhuma UI para o histórico.** O agente registra e o histórico vira contexto, mas o dono não tem tela para ver, editar ou apagar os eventos. `removerEvento` já existe em `events-api.ts` e não está ligada a nada. Antes de qualquer usuário real, isso precisa existir — registro automático sem forma de corrigir é armadilha.
+
+- **`registrarEvento` sem confirmação.** O agente grava direto, por decisão de UX (o fluxo "manda áudio e está registrado" morre se pedir confirmação). O contrapeso previsto era poder apagar depois — que depende da pendência acima. Até lá, registro errado fica preso.
+
+- **Ferramenta obedecida por prompt, não por garantia.** `atualizarHipoteses` depende de o modelo decidir chamá-la. Duas rodadas de ajuste foram necessárias para ele chamar em todos os turnos, e nada impede uma regressão silenciosa: se ele parar de chamar, o painel congela mostrando raciocínio velho. Uma trava possível seria detectar diagnóstico no servidor e usar `toolChoice: "required"` — mas a detecção é heurística e forçaria a chamada em procedimento e especificação, onde o painel não deve aparecer.
+
+- **Painel sem estado de carregamento.** Enquanto o modelo pensa, o painel mostra o estado anterior sem indicar que está desatualizado. Numa reordenação grande de pesos isso confunde.
 
 - **Exclusão de conta não existe.** Requisito de publicação na Play Store (in-app + URL pública). Bloqueia o lançamento. Planejado para a Fase 2, junto com a migração — apagar conta precisa limpar Postgres e Storage numa transação só. `firestore.rules` já proíbe o cliente de deletar o próprio documento justamente porque isso tem que passar pelo servidor.
 
@@ -26,8 +42,6 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 - **Persistência da thread reescreve tudo.** `saveThreadMessages` grava o documento inteiro (todas as mensagens) a cada 600 ms durante o streaming. Ineficiente e caro em escritas. Some na Fase 2, quando `messages` virar tabela com uma linha por mensagem.
 
 - **Store manual em vez de TanStack Query.** `features/*/api.ts` usa `useSyncExternalStore` escrito à mão. `@tanstack/react-query` já é dependência e está sem uso. A troca acontece na Fase 2, junto com a mudança de backend — fazer antes seria reescrever duas vezes.
-
-- **Logo pesado.** `src/assets/fusca-logo.png` tem 346 KB para ser exibido a 96 px, e o build gera um chunk de ~638 KB por causa dele. Vale gerar versões redimensionadas em WebP. Não foi feito por falta de ferramenta de imagem no ambiente.
 
 - **Sem observabilidade.** Só `console.error`. Com usuário pagante, erro que ninguém vê não existe. Escolher e plugar (Sentry ou equivalente) antes do lançamento.
 
@@ -38,6 +52,49 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-07-25 — Painel de raciocínio
+
+Torna visível o que o agente está pensando: hipóteses vivas com peso, o que refutaria cada uma, e as descartadas com o motivo. Transforma o método em interface, ensina o dono a diagnosticar e é algo que chatbot genérico não faz.
+
+**O estado não tem armazenamento próprio.** Ele é derivado das chamadas da ferramenta `atualizarHipoteses`, que já vivem nas partes das mensagens. Consequências, todas boas: persiste junto com a thread sem tabela nova, sobrevive a recarregar a página, e o histórico do raciocínio fica auditável — dá para ver como as hipóteses evoluíram, não só onde pararam.
+
+**Alternativa descartada:** saída estruturada via `generateObject`. Conflitaria com o streaming da prosa, e a ferramenta já resolvia com a infraestrutura montada uma hora antes.
+
+**Três bugs encontrados só porque o app foi realmente aberto**, nenhum deles visível em typecheck ou teste:
+
+1. **Faltava `sendAutomaticallyWhen`.** Sem ele o `useChat` grava o resultado da ferramenta e para — nada reenvia ao servidor, então o modelo nunca continua. Sintoma: bolha de assistente vazia e um único POST em `/api/chat`. **Isso afetava também o `registrarEvento`**, entregue antes sem teste de ponta a ponta; estava quebrado desde então.
+
+2. **O modelo ignorava a ferramenta.** A instrução estava numa seção separada e ele narrava as hipóteses em prosa — exatamente o que o prompt pedia para não fazer. Resolveu ao mover a ordem para dentro do passo 1 do laço, colada à ação.
+
+3. **O painel congelava depois do primeiro turno.** O modelo chamava a ferramenta na abertura e não nas reduções seguintes: o texto descartava hipóteses corretamente enquanto o painel seguia mostrando todas vivas. Painel desatualizado é pior que painel nenhum. Resolveu com uma regra incondicional no topo do método — "toda resposta num diagnóstico começa chamando `atualizarHipoteses`".
+
+Esses três reforçam a pendência do eval: foram descobertos por anedota, um caso de cada vez. Sem medição, a próxima regressão passa batido.
+
+### 2026-07-25 — Método de diagnóstico, falseamento e memória do carro
+
+Três mudanças que respondem à mesma pergunta: o que faz este agente valer assinatura em vez de ser Gemini com um prompt bonito.
+
+**Método em vez de formatação.** O prompt anterior dizia "apresente as causas mais prováveis primeiro" — instrução de formato, não de raciocínio. Agora há um laço explícito: hipóteses → falseamento → perguntas → redução → testes → conclusão.
+
+O detalhe que faz funcionar é a **triagem antes do laço**. Diagnóstico, procedimento, especificação e conversa recebem tratamentos diferentes. Sem isso, quem pergunta "como regulo as válvulas" ouviria "tenho três hipóteses, me conte mais" — e desistiria do app. É o que torna o fluxo orientador em vez de camisa de força.
+
+**Falseamento como regra operacional.** Para cada hipótese o agente precisa responder a si mesmo "o que provaria que NÃO é isso?", e ao propor teste deve preferir o que _distingue_ hipóteses ao que apenas confirma a favorita. Combate viés de confirmação, que num diagnóstico se manifesta como mandar trocar peça sem evidência — dinheiro do dono.
+
+**Histórico como memória diagnóstica, não diário de manutenção.** A distinção é do dono do projeto e muda o modelo inteiro: o usuário abre o app para resolver problema, então o histórico existe para virar contexto no próximo diagnóstico.
+
+Consequências de desenho, todas deliberadas:
+
+- **Desfecho desconhecido é o caso comum e continua valendo.** "Identificamos problema na bobina — sem confirmação de que foi resolvido" é informação legítima: diz que este carro já teve suspeita naquele sistema. Exigir que o usuário feche o ciclo faria o histórico morrer por atrito.
+- **Uma linha curta por evento.** Não é estética: o histórico entra no contexto de toda conversa, então linha longa é custo por mensagem que se paga para sempre.
+- **Detecção de recorrência.** Dois ou mais episódios no mesmo sistema disparam alerta no prompt — se o sintoma voltou, a solução anterior não resolveu, ou a causa real está a montante. É o sinal de maior valor que só o histórico fornece.
+- **Filtro por sistema** (`server/ai/sistema.ts`): heurística determinística e testável, não classificação por modelo. Errar ali degrada relevância do histórico, não a resposta.
+
+**Alternativa descartada:** registro manual pelo usuário na tela da garagem. Diário de manutenção alimentado à mão morre por abandono — é padrão conhecido. O agente registra sozinho quando o dono relata um serviço ("troquei as 4 velas", inclusive por áudio, com a data derivada do momento) ou quando um diagnóstico chega a uma suspeita.
+
+**Consequência arquitetural:** isso exigiu _tool calling_, que o app não tinha. `registrarEvento` é definida **sem `execute`**, o que no AI SDK a torna ferramenta de cliente: o agente decide, o navegador grava. O motivo é concreto — a sessão autenticada do Firestore existe no cliente, e dar credencial de administrador ao servidor só para isso seria ampliar a superfície de risco sem necessidade.
+
+**Persistência em Firestore, sabendo que é temporário.** `events-api.ts` será reescrito na Fase 2. Aceitei o retrabalho porque a separação `model.ts`/`api.ts` deixa `events.ts` — modelo, formatação, seleção de contexto, recorrência — 100% portável. São ~100 linhas de I/O descartáveis em troca da funcionalidade valendo agora em vez de depois da migração inteira.
 
 ### 2026-07-25 — Remover os plugins pesados do Streamdown
 
@@ -91,6 +148,7 @@ Reorganizado em `features/` (domínio), `server/` (só servidor) e `shared/` (tr
 
 ## Histórico resolvido
 
+- **2026-07-25** — Logo de 346 KB (PNG) → 37 KB (JPEG fornecido pelo dono do projeto), 89% menor. Os componentes ainda declaram `width={1024} height={1024}`; se o novo arquivo não for quadrado, há leve deslocamento de layout antes de carregar.
 - **2026-07-25** — Zero testes → 62 testes cobrindo título de conversa, ficha do veículo e preparo de mensagens. Vitest configurado em `vitest.config.ts`, separado do `vite.config.ts` de propósito (os testes não devem carregar os plugins de SSR/Nitro).
 - **2026-07-25** — Zero validação → zod no payload de `/api/chat` e nas variáveis de ambiente, com erro legível na inicialização em vez de quebrar quando o usuário abre o chat.
 - **2026-07-25** — 45 dependências → 35. Removidos 17 pacotes Radix, `recharts`, `embla-carousel-react`, `react-day-picker`, `input-otp`, `vaul`, `react-resizable-panels`, `react-hook-form`, `@hookform/resolvers`, `react-markdown`, `date-fns` e 3 plugins do Streamdown. Junto, 34 componentes `ui/` órfãos do scaffold do shadcn.

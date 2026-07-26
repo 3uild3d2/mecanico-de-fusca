@@ -41,9 +41,38 @@ const uiMessageSchema = z.object({
 
 const vehicleSchema = z.record(z.string(), z.string()).nullable().optional();
 
+export const SISTEMAS = [
+  "motor",
+  "eletrica",
+  "carburacao",
+  "ignicao",
+  "freios",
+  "suspensao",
+  "cambio",
+  "arrefecimento",
+  "outro",
+] as const;
+
+/** Teto de eventos aceitos por requisição — o cliente já envia só o recorte. */
+export const MAX_EVENTS_PER_REQUEST = 60;
+
+const vehicleEventSchema = z.object({
+  id: z.string(),
+  tipo: z.enum(["diagnostico", "servico", "observacao"]),
+  titulo: z.string().min(1),
+  sistema: z.enum(SISTEMAS).optional(),
+  desfecho: z.enum(["suspeita", "confirmado", "descartado", "sem_retorno"]).optional(),
+  data: z.number(),
+  km: z.number().optional(),
+  threadId: z.string().optional(),
+  origem: z.enum(["agente", "usuario"]),
+  criadoEm: z.number(),
+});
+
 export const chatRequestSchema = z.object({
   messages: z.array(uiMessageSchema).min(1).max(MAX_MESSAGES_PER_REQUEST),
   vehicle: vehicleSchema,
+  events: z.array(vehicleEventSchema).max(MAX_EVENTS_PER_REQUEST).optional(),
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
