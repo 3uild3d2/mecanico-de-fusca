@@ -14,6 +14,24 @@ export type Thread = {
 export const NEW_THREAD_TITLE = "Nova conversa";
 export const MAX_TITLE_LENGTH = 60;
 
+/**
+ * Quantas mensagens recentes o modelo recebe. Vale para os dois lados: o
+ * servidor aplica a janela (defesa de custo) e o cliente envia só ela — não faz
+ * sentido subir a conversa inteira se o servidor descarta o resto.
+ */
+export const JANELA_HISTORICO_MENSAGENS = 24;
+
+/**
+ * Recorte do que o navegador envia ao /api/chat. Sem ele, uma conversa longa
+ * ultrapassava o teto de mensagens do schema e passava a ser recusada inteira,
+ * antes mesmo de a janela do servidor ser aplicada.
+ */
+export function recorteParaEnvio<T>(messages: T[]): T[] {
+  return messages.length <= JANELA_HISTORICO_MENSAGENS
+    ? messages
+    : messages.slice(-JANELA_HISTORICO_MENSAGENS);
+}
+
 const TITLE_STOPWORDS = new Set([
   "a",
   "ao",

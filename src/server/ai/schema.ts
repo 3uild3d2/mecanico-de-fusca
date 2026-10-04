@@ -53,8 +53,18 @@ export const SISTEMAS = [
   "outro",
 ] as const;
 
-/** Teto de eventos aceitos por requisição — o cliente já envia só o recorte. */
-export const MAX_EVENTS_PER_REQUEST = 60;
+/**
+ * Teto de eventos por requisição. É defesa contra abuso, NÃO recorte de
+ * contexto: o cliente envia o histórico inteiro do carro, e quem escolhe o que
+ * entra no prompt é buildHistoryContext. Precisa ser o histórico inteiro porque
+ * o alerta de recorrência conta todos os episódios do sistema, não só os
+ * selecionados — um recorte no cliente faria o número sair errado.
+ *
+ * Antes era 60, e todo usuário ativo passava disso (o agente registra sozinho):
+ * a partir daí toda mensagem era recusada. 1000 eventos ≈ 330 KB no pior caso.
+ * A solução definitiva é o servidor buscar os eventos no banco.
+ */
+export const MAX_EVENTS_PER_REQUEST = 1000;
 
 const vehicleEventSchema = z.object({
   id: z.string(),

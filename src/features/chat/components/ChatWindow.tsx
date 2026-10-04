@@ -30,13 +30,21 @@ import { Shimmer } from "@/features/chat/components/shimmer";
 import { uploadChatFiles } from "@/features/chat/attachments";
 import { getThread, saveThreadMessages, useThread } from "@/features/chat/api";
 import { extractEstadoDiagnostico, type EstadoDiagnostico } from "@/features/chat/hipoteses";
+import { recorteParaEnvio } from "@/features/chat/model";
 import { useActiveVehicle } from "@/features/garage/api";
 import { registrarEvento, useVehicleEvents } from "@/features/garage/events-api";
 import type { VehicleEvent } from "@/features/garage/events";
 import fuscaLogo from "@/assets/fusca-logo.png";
 import contaGirosNiveis from "@/assets/conta_giros_4_niveis.png";
 
-const transport = new DefaultChatTransport({ api: "/api/chat" });
+const transport = new DefaultChatTransport({
+  api: "/api/chat",
+  // Envia só a janela que o servidor usa. A conversa inteira continua no estado
+  // local e no banco; o que muda é o que sobe a cada mensagem.
+  prepareSendMessagesRequest: ({ id, messages, body, trigger, messageId }) => ({
+    body: { ...body, id, messages: recorteParaEnvio(messages), trigger, messageId },
+  }),
+});
 
 const SUGGESTIONS = [
   { level: 1, text: "Meu fusca falha quando acelero" },

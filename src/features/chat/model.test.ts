@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
 
 import {
+  JANELA_HISTORICO_MENSAGENS,
   NEW_THREAD_TITLE,
   deriveTitle,
   getMessageText,
   knownTopicTitle,
   nextThreadTitle,
   normalizeManualTitle,
+  recorteParaEnvio,
   sanitizeMessages,
 } from "./model";
 
@@ -185,5 +187,26 @@ describe("sanitizeMessages", () => {
     ];
     sanitizeMessages(messages);
     expect(messages[0].parts).toHaveLength(1);
+  });
+});
+
+describe("recorteParaEnvio", () => {
+  const conversa = (n: number): UIMessage[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `m${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      parts: [{ type: "text", text: `mensagem ${i}` }],
+    }));
+
+  it("mantém a conversa inteira quando cabe na janela", () => {
+    const mensagens = conversa(JANELA_HISTORICO_MENSAGENS);
+    expect(recorteParaEnvio(mensagens)).toEqual(mensagens);
+  });
+
+  it("envia só as últimas mensagens da janela — conversa longa não pode ser recusada", () => {
+    const recorte = recorteParaEnvio(conversa(250));
+    expect(recorte).toHaveLength(JANELA_HISTORICO_MENSAGENS);
+    expect(recorte.at(-1)?.id).toBe("m249");
+    expect(recorte[0]?.id).toBe(`m${250 - JANELA_HISTORICO_MENSAGENS}`);
   });
 });

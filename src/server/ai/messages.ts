@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
 import type { UIMessage } from "ai";
 
+import { JANELA_HISTORICO_MENSAGENS } from "@/features/chat/model";
+
 import { TRIMMED_ATTACHMENT_NOTE } from "./prompt";
 
 /**
@@ -16,7 +18,7 @@ import { TRIMMED_ATTACHMENT_NOTE } from "./prompt";
  *    fotos reenviava as 5 imagens inteiras em toda mensagem nova.
  */
 
-export const MAX_HISTORY_MESSAGES = 24;
+export const MAX_HISTORY_MESSAGES = JANELA_HISTORICO_MENSAGENS;
 export const ATTACHMENT_WINDOW_MESSAGES = 4;
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
