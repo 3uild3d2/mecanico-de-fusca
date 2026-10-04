@@ -13,7 +13,7 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no código** antes de entrar aqui — todos os achados procederam. Ordem acordada:
 
 1. ~~Limites do `/api/chat` aplicados antes do recorte~~ — **feito em 2026-10-04.** Ver Decisões.
-2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI. **Em andamento:** seletor de modelos e medição por resposta prontos (2026-10-04); falta a bateria, o executor e o juiz. Decisões do dono: eu rascunho ~15 casos e ele revisa; nota por modelo juiz automático; Gemini atual entra como referência.
+2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI. **Em andamento:** seletor, medição por resposta, 15 casos rascunhados, executor e juiz prontos e testados (2026-10-04) — `npm run avaliar`. Bloqueado para rodar de verdade: Gemini em 403 e chave própria da OpenAI ainda não configurada. Casos aguardam revisão do dono (`revisado: false`). Decisões do dono: eu rascunho ~15 casos e ele revisa; nota por modelo juiz automático; Gemini atual entra como referência.
 3. `/api/chat` com sessão obrigatória e limite de uso; downloads de anexo restritos ao Storage do projeto.
 4. Histórico e conversa separados por veículo (migration nova).
 5. Persistência só do que mudou; resumo estruturado do diagnóstico; RAG piloto.
@@ -54,6 +54,8 @@ Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no 
 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
 
+- **Cast sobre saída do modelo em `ChatWindow.tsx`** (achado em 2026-10-04). `onToolCall` faz `toolCall.input as RegistrarEventoInput` — entrada que veio do modelo passando sem validação, contra a regra 3. Trocar por `safeParse` do mesmo schema de `tools.ts`.
+
 - **Gemini respondendo 403 "Your project has been denied access"** (desde 2026-10-04). Uma chamada passou e, minutos depois, todas as seguintes falharam com `PERMISSION_DENIED` vindo de `generativelanguage.googleapis.com`. É bloqueio na conta Google AI Studio / Google Cloud, não no código. É o modelo de produção: enquanto durar, o chat não responde com o padrão.
 
 - **Histórico do carro misturado entre veículos** (achado em 2026-10-04, etapa 4 do plano). `vehicle_events` grava `vehicle_id`, mas `events-api.ts` carrega por `user_id` só; e `threads` não tem `vehicle_id`, então a conversa usa a ficha do veículo *ativo na garagem*, não a do carro dela. Com Fusca e Brasília cadastrados, a bobina trocada num entra no contexto do outro, e reabrir uma conversa antiga com outro carro selecionado troca a ficha.
@@ -93,6 +95,17 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-10-04 — Bateria de avaliação: roteiro fixo, juiz anônimo, resultados fora do git
+
+Pasta `avaliacao/` (fora do app, dentro do typecheck e dos testes). Casos em `casos.ts`; `npm run avaliar -- --modelos a,b --juiz c` conduz, verifica, julga e grava `avaliacao/resultados/*.{json,html}`.
+
+- **Falas do dono são roteiro fixo**, não geradas por outro modelo fazendo papel de dono. **Descartado:** "dono simulado" — cada modelo receberia evidências diferentes conforme suas perguntas e a comparação deixaria de valer. Custo aceito: a fala seguinte não responde exatamente o que o mecânico perguntou.
+- **Checagem objetiva separada do juiz.** Painel de hipóteses em todo turno de diagnóstico, nenhum fora dele, e desfecho do registro (suspeita × confirmado) são medidos por código (`verificacao.ts`), sem opinião.
+- **Juiz anônimo:** não recebe o nome do modelo. Modelos tendem a favorecer o próprio fornecedor; o anonimato reduz, mas não elimina (estilo de escrita denuncia). Por isso o juiz avalia critério a critério com evidência citada, não impressão geral.
+- **O executor imita o navegador:** cada ferramenta de cliente recebe `{ ok: true }` e a conversa segue numa nova ida ao modelo, com teto de 6 por fala.
+- **Resultados não versionados** (`.gitignore`): são gerados. O que se decidir a partir deles entra aqui.
+- **Armadilha do SDK:** `MockLanguageModelV3` com array de respostas (AI SDK 6.0.210) registra a chamada antes de indexar — a primeira chamada recebe o item 1. Os testes usam um sequenciador próprio (`conversa.test.ts`).
 
 ### 2026-10-04 — Chave da OpenAI com nome próprio: `MECANICO_OPENAI_API_KEY`
 
