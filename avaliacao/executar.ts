@@ -27,6 +27,9 @@ const { values } = parseArgs({
     juiz: { type: "string" },
     casos: { type: "string" },
     paralelo: { type: "string", default: "3" },
+    // O mesmo caso no mesmo modelo varia entre execuções (medido em 2026-10-04:
+    // tokens, tempo e até o desfecho registrado mudaram). Uma execução só é ruído.
+    repeticoes: { type: "string", default: "2" },
     // Premissa de uso para projetar o custo mensal por assinante. Não é dado
     // medido: ajuste quando houver uso real.
     "mensagens-por-mes": { type: "string", default: "100" },
@@ -75,10 +78,21 @@ async function main() {
     const modelo = criarModelo(modeloId, env);
     console.log(`\n▶ ${modeloId} — ${casos.length} casos`);
 
-    const doModelo = await emLotes(casos, paralelo, async (caso) => {
+    const repeticoes = Math.max(1, Number(values.repeticoes) || 1);
+    const execucoes = casos.flatMap((caso) =>
+      Array.from({ length: repeticoes }, (_, i) => ({ caso, repeticao: i + 1 })),
+    );
+    const doModelo = await emLotes(execucoes, paralelo, async ({ caso, repeticao }) => {
       const turnos = await conduzirCaso(caso, modelo);
       const verificacao = verificar(caso, turnos);
-      let resultado: ResultadoCaso = { caso, modelo: modeloId, turnos, verificacao, juiz: null };
+      let resultado: ResultadoCaso = {
+        caso,
+        modelo: modeloId,
+        repeticao,
+        turnos,
+        verificacao,
+        juiz: null,
+      };
       try {
         const j = await julgar(caso, turnos, modeloJuiz);
         resultado = {
@@ -94,7 +108,7 @@ async function main() {
       }
       const nota = resultado.juiz ? `${resultado.juiz.nota}/10` : "sem nota";
       const alerta = verificacao.falhas.length ? ` · ${verificacao.falhas.length} falha(s)` : "";
-      console.log(`  ${caso.id.padEnd(26)} ${nota}${alerta}`);
+      console.log(`  ${caso.id.padEnd(26)} #${repeticao} ${nota}${alerta}`);
       return resultado;
     });
     resultados.push(...doModelo);

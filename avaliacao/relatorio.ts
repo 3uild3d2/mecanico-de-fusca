@@ -32,7 +32,7 @@ function tabelaPlacar(placar: PlacarModelo[]): string {
     .map(
       (p) => `<tr>
   <th scope="row">${esc(nomeCurto(p.modelo))}</th>
-  <td>${num(p.notaMedia)}</td>
+  <td>${num(p.notaMedia)}${p.notaDesvio === null ? "" : ` <small>± ${num(p.notaDesvio)}</small>`}</td>
   <td>${pct(p.acertoCausa)}</td>
   <td>${pct(p.criteriosCumpridos)}</td>
   <td>${pct(p.conformidadeHipoteses)}</td>
@@ -149,7 +149,7 @@ ${t.ferramentas.map((f) => `<div class="ferramenta">⚙ ${esc(f.nome)} <code>${e
     .join("\n");
 
   return `<section class="modelo">
-<h4>${esc(nomeCurto(r.modelo))}</h4>
+<h4>${esc(nomeCurto(r.modelo))}${r.repeticao ? ` <small>execução ${r.repeticao}</small>` : ""}</h4>
 ${juiz}
 ${falhas}
 <details><summary>Conversa completa</summary>${conversa}</details>

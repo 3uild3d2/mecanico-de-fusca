@@ -8,6 +8,8 @@ import type { Turno, Verificacao } from "./verificacao";
 export type ResultadoCaso = {
   caso: Caso;
   modelo: string;
+  /** Qual execução do caso é esta (1, 2, ...). O mesmo caso varia entre execuções. */
+  repeticao?: number;
   turnos: Turno[];
   verificacao: Verificacao;
   juiz: AvaliacaoJuiz | null;
@@ -18,8 +20,15 @@ export type ResultadoCaso = {
 export type PlacarModelo = {
   modelo: string;
   casos: number;
+  /** Execuções somadas (casos × repetições). */
+  execucoes: number;
   /** Média da nota 0–10 do juiz, só sobre casos julgados. */
   notaMedia: number | null;
+  /**
+   * Desvio-padrão da nota entre execuções. Dois modelos cuja diferença de nota
+   * é menor que isto estão empatados na prática.
+   */
+  notaDesvio: number | null;
   /** Diagnósticos: acertou = 1, parcial = 0,5, errou = 0. */
   acertoCausa: number | null;
   /** Fração de critérios cumpridos, somando todos os casos julgados. */
@@ -39,6 +48,12 @@ export type PlacarModelo = {
 
 function media(valores: number[]): number | null {
   return valores.length === 0 ? null : valores.reduce((a, b) => a + b, 0) / valores.length;
+}
+
+function desvio(valores: number[]): number | null {
+  const m = media(valores);
+  if (m === null || valores.length < 2) return null;
+  return Math.sqrt(valores.reduce((s, v) => s + (v - m) ** 2, 0) / valores.length);
 }
 
 const PESO_CAUSA = { acertou: 1, parcial: 0.5, errou: 0 } as const;
@@ -68,8 +83,10 @@ export function calcularPlacar(
 
     return {
       modelo,
-      casos: rs.length,
+      casos: new Set(rs.map((r) => r.caso.id)).size,
+      execucoes: rs.length,
       notaMedia: media(julgados.map((j) => j.nota)),
+      notaDesvio: desvio(julgados.map((j) => j.nota)),
       acertoCausa: media(causas),
       criteriosCumpridos:
         criterios.length === 0

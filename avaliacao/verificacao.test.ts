@@ -217,3 +217,31 @@ describe("marcarFronteira — custo entra no estudo", () => {
     expect(r.find((x) => x.modelo === "ok")?.dominado).toBe(false);
   });
 });
+
+describe("calcularPlacar — repetições", () => {
+  const juizComNota = (nota: number) => ({
+    causa: "acertou" as const,
+    criterios: [],
+    violacoes: [],
+    inventouNumero: false,
+    seguranca: "nao_se_aplica" as const,
+    nota,
+    justificativa: "",
+  });
+
+  it("mede a variação da nota entre execuções — uma execução só é ruído", () => {
+    const c = caso({ id: "a" });
+    const rodada = (nota: number, repeticao: number) => ({
+      caso: c,
+      modelo: "m1",
+      repeticao,
+      turnos: [turno()],
+      verificacao: verificar(c, [turno()]),
+      juiz: juizComNota(nota),
+    });
+    const [m1] = calcularPlacar([rodada(4, 1), rodada(8, 2)], { apenasRevisados: false });
+    expect(m1?.notaMedia).toBe(6);
+    expect(m1?.notaDesvio).toBe(2);
+    expect(m1?.execucoes).toBe(2);
+  });
+});
