@@ -106,12 +106,15 @@ async function main() {
     gerarRelatorioHtml({ geradoEm, juiz: juizId, resultados, placar }),
   );
 
-  console.log("\nPlacar (nota média · acerto de causa · tokens por caso · tempo por caso)");
+  console.log(
+    "\nPlacar (nota média · acerto de causa · US$ por mensagem · tokens por caso · tempo por caso)",
+  );
   for (const p of placar) {
+    const causa = p.acertoCausa === null ? "—" : `${Math.round(p.acertoCausa * 100)}%`;
+    const custo = p.custoPorMensagem === null ? "—" : p.custoPorMensagem.toFixed(4);
+    const tokens = `${Math.round(p.tokensPorCaso.entrada)}→${Math.round(p.tokensPorCaso.saida)}`;
     console.log(
-      `  ${p.modelo.padEnd(36)} ${p.notaMedia?.toFixed(1) ?? "—"} · ${
-        p.acertoCausa === null ? "—" : `${Math.round(p.acertoCausa * 100)}%`
-      } · ${Math.round(p.tokensPorCaso.entrada)}→${Math.round(p.tokensPorCaso.saida)} · ${p.segundosPorCaso.toFixed(1)} s`,
+      `  ${p.modelo.padEnd(36)} ${p.notaMedia?.toFixed(1) ?? "—"} · ${causa} · ${custo} · ${tokens} · ${p.segundosPorCaso.toFixed(1)} s`,
     );
   }
   console.log(`\nRelatório: ${join(pasta, `${nome}.html`)}`);

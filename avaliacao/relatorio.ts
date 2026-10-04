@@ -17,6 +17,12 @@ const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%
 const num = (v: number | null, casas = 1) =>
   v === null ? "—" : v.toLocaleString("pt-BR", { maximumFractionDigits: casas });
 
+/** Centavos de dólar importam aqui: custo por mensagem costuma ser fração de centavo. */
+const dolar = (v: number | null) =>
+  v === null
+    ? "—"
+    : `US$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
+
 const CAUSA = { acertou: "✔ acertou", parcial: "◐ parcial", errou: "✘ errou", nao_se_aplica: "—" };
 
 function tabelaPlacar(placar: PlacarModelo[]): string {
@@ -32,6 +38,7 @@ function tabelaPlacar(placar: PlacarModelo[]): string {
   <td>${p.casosComNumeroInventado}</td>
   <td>${p.registrosIncorretos}</td>
   <td>${p.falhasObjetivas}</td>
+  <td>${dolar(p.custoPorMensagem)}</td>
   <td>${num(p.tokensPorCaso.entrada, 0)} → ${num(p.tokensPorCaso.saida, 0)}</td>
   <td>${num(p.segundosPorCaso)} s</td>
 </tr>`,
@@ -42,7 +49,7 @@ function tabelaPlacar(placar: PlacarModelo[]): string {
 <thead><tr>
   <th>Modelo</th><th>Nota média</th><th>Acerto de causa</th><th>Critérios</th>
   <th>Painel de hipóteses</th><th>Inventou número</th><th>Registro errado</th>
-  <th>Falhas objetivas</th><th>Tokens por caso</th><th>Tempo por caso</th>
+  <th>Falhas objetivas</th><th>Custo por mensagem</th><th>Tokens por caso</th><th>Tempo por caso</th>
 </tr></thead>
 <tbody>${linhas}</tbody>
 </table></div>`;

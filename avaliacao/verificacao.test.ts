@@ -159,4 +159,35 @@ describe("calcularPlacar", () => {
     );
     expect(placar[0]?.casos ?? 0).toBe(0);
   });
+
+  it("estima o custo por mensagem do dono com a tabela de preços", () => {
+    const c = caso({ id: "a" });
+    const turnos = [
+      turno({ tokensEntrada: 1_000_000, tokensSaida: 0 }),
+      turno({ tokensEntrada: 0, tokensSaida: 1_000_000 }),
+    ];
+    const placar = calcularPlacar(
+      [{ caso: c, modelo: "openai:gpt-x", turnos, verificacao: verificar(c, turnos), juiz: null }],
+      { apenasRevisados: false, preco: () => ({ entrada: 2, saida: 10 }) },
+    );
+    // (1M × 2 + 1M × 10) / 2 mensagens = US$ 6 por mensagem
+    expect(placar[0]?.custoPorMensagem).toBe(6);
+  });
+
+  it("sem preço conhecido, o custo fica em branco em vez de zero", () => {
+    const c = caso({ id: "a" });
+    const placar = calcularPlacar(
+      [
+        {
+          caso: c,
+          modelo: "openai:sem-preco",
+          turnos: [turno()],
+          verificacao: verificar(c, [turno()]),
+          juiz: null,
+        },
+      ],
+      { apenasRevisados: false, preco: () => null },
+    );
+    expect(placar[0]?.custoPorMensagem).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 import type { Caso } from "./casos";
 import type { AvaliacaoJuiz } from "./juiz";
+import { precoPorMilhao } from "./precos";
 import type { Turno, Verificacao } from "./verificacao";
 
 // Agregação por modelo. Sem I/O.
@@ -28,6 +29,11 @@ export type PlacarModelo = {
   falhasObjetivas: number;
   tokensPorCaso: { entrada: number; saida: number };
   segundosPorCaso: number;
+  /**
+   * US$ por mensagem do dono — o número que se compara com a assinatura.
+   * null quando o modelo não está na tabela de preços.
+   */
+  custoPorMensagem: number | null;
 };
 
 function media(valores: number[]): number | null {
@@ -38,8 +44,12 @@ const PESO_CAUSA = { acertou: 1, parcial: 0.5, errou: 0 } as const;
 
 export function calcularPlacar(
   resultados: ResultadoCaso[],
-  opcoes: { apenasRevisados: boolean },
+  opcoes: {
+    apenasRevisados: boolean;
+    preco?: (modelo: string) => { entrada: number; saida: number } | null;
+  },
 ): PlacarModelo[] {
+  const preco = opcoes.preco ?? precoPorMilhao;
   const validos = resultados.filter((r) => !opcoes.apenasRevisados || r.caso.revisado);
   const porModelo = new Map<string, ResultadoCaso[]>();
   for (const r of validos) porModelo.set(r.modelo, [...(porModelo.get(r.modelo) ?? []), r]);
@@ -73,6 +83,20 @@ export function calcularPlacar(
         saida: media(rs.map(soma((t) => t.tokensSaida))) ?? 0,
       },
       segundosPorCaso: (media(rs.map(soma((t) => t.duracaoMs))) ?? 0) / 1000,
+      custoPorMensagem: custoPorMensagem(rs, preco(modelo)),
     };
   });
+}
+
+function custoPorMensagem(
+  rs: ResultadoCaso[],
+  p: { entrada: number; saida: number } | null,
+): number | null {
+  const turnos = rs.flatMap((r) => r.turnos);
+  if (!p || turnos.length === 0) return null;
+  const total = turnos.reduce(
+    (soma, t) => soma + (t.tokensEntrada * p.entrada + t.tokensSaida * p.saida) / 1_000_000,
+    0,
+  );
+  return total / turnos.length;
 }
