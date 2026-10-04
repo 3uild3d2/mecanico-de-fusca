@@ -4,7 +4,7 @@ import type { PlacarModelo, ResultadoCaso } from "./placar";
 // texto. Todo texto vindo de caso ou de modelo passa por esc() — a resposta de
 // um modelo é dado, não marcação.
 
-function esc(texto: string): string {
+export function esc(texto: string): string {
   return texto
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

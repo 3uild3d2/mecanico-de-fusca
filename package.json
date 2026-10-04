@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "avaliar": "tsx --env-file=.env --tsconfig tsconfig.json avaliacao/executar.ts"
+    "avaliar": "tsx --env-file=.env --tsconfig tsconfig.json avaliacao/executar.ts",
+    "avaliar:revisao": "tsx --tsconfig tsconfig.json avaliacao/revisao.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.84",
