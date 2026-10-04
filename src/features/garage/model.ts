@@ -98,6 +98,19 @@ export function normalizeVehicle(data: Record<string, unknown>): VehicleProfile 
   };
 }
 
+export function vehicleDisplayName(vehicle: VehicleProfile): string {
+  const apelido = vehicle.apelido?.trim();
+  if (apelido) return apelido;
+
+  const modelo = vehicle.modelo?.trim();
+  const ano = vehicle.ano?.trim();
+  if (modelo && ano) return `${modelo} ${ano}`;
+  if (modelo) return modelo;
+  if (ano) return `Fusca ${ano}`;
+
+  return "Fusca";
+}
+
 /**
  * Serializa a ficha para o prompt. Retorna null quando não há nada de útil —
  * assim o servidor não injeta um bloco de contexto vazio.

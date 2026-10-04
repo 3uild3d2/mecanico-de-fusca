@@ -15,37 +15,80 @@ import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { useActiveVehicle, saveActiveVehicle } from "@/features/garage/api";
-import { FUSCA_OPTIONS, VEHICLE_DEFAULTS, type VehicleProfile } from "@/features/garage/model";
+import { saveVehicle, selectVehicle, useVehicles } from "@/features/garage/api";
+import {
+  FUSCA_OPTIONS,
+  VEHICLE_DEFAULTS,
+  vehicleDisplayName,
+  type VehicleProfile,
+} from "@/features/garage/model";
+
+const NEW_VEHICLE_ID = "novo";
+
+function blankVehicle(): VehicleProfile {
+  return {
+    ignicao: VEHICLE_DEFAULTS.ignicao,
+    sistema_eletrico: VEHICLE_DEFAULTS.sistema_eletrico,
+  };
+}
 
 export function VehicleProfileDialog() {
-  const activeVehicle = useActiveVehicle();
+  const vehicles = useVehicles();
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<VehicleProfile>({});
+  const [selectedId, setSelectedId] = useState<string>(NEW_VEHICLE_ID);
+  const [formData, setFormData] = useState<VehicleProfile>(blankVehicle);
+
+  const activeVehicle = vehicles.find((vehicle) => vehicle.active) ?? vehicles[0] ?? null;
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (activeVehicle) {
-      setFormData(activeVehicle);
-    } else {
-      setFormData({
-        ignicao: VEHICLE_DEFAULTS.ignicao,
-        sistema_eletrico: VEHICLE_DEFAULTS.sistema_eletrico,
-      });
-    }
+    if (!open) return;
+
+    const nextSelectedId = activeVehicle?.id ?? NEW_VEHICLE_ID;
+    setSelectedId(nextSelectedId);
+    setFormData(activeVehicle?.profile ?? blankVehicle());
   }, [activeVehicle, open]);
+
+  useEffect(() => {
+    if (selectedId === NEW_VEHICLE_ID) {
+      setFormData(blankVehicle());
+      return;
+    }
+
+    if (selectedVehicle) setFormData(selectedVehicle.profile);
+  }, [selectedId, selectedVehicle]);
 
   const handleChange = (field: keyof VehicleProfile, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSelectVehicle = async (id: string) => {
+    setSelectedId(id);
+
+    try {
+      await selectVehicle(id);
+    } catch (error) {
+      console.error("Erro ao selecionar veículo:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível selecionar o veículo.",
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await saveActiveVehicle(formData);
+      const saved = await saveVehicle(formData, selectedId === NEW_VEHICLE_ID ? null : selectedId);
+      setSelectedId(saved.id);
       toast.success("Ficha do veículo salva com sucesso!");
       setOpen(false);
-    } catch {
-      toast.error("Não foi possível salvar a ficha. Verifique se você está conectado.");
+    } catch (error) {
+      console.error("Erro ao salvar ficha do veículo:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar a ficha. Verifique se você está conectado.",
+      );
     }
   };
 
@@ -67,11 +110,47 @@ export function VehicleProfileDialog() {
             Ficha Técnica do Veículo
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Estes dados ajudam o mecânico a acertar o diagnóstico no chat.
+            Estes dados ajudam o mecânico a acertar o diagnóstico.
           </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+          <div className="overflow-x-auto border-b border-border pb-2">
+            <div className="flex min-w-max items-end gap-1 px-1">
+              <button
+                type="button"
+                onClick={() => setSelectedId(NEW_VEHICLE_ID)}
+                className={
+                  selectedId === NEW_VEHICLE_ID
+                    ? "relative -mb-px rounded-t-xl border border-border border-b-background bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-sm"
+                    : "rounded-t-xl border border-border/70 bg-muted/60 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                }
+              >
+                Novo Fusca
+              </button>
+              {vehicles.map((vehicle) => {
+                const selected = selectedId === vehicle.id;
+                return (
+                  <button
+                    key={vehicle.id}
+                    type="button"
+                    onClick={() => void handleSelectVehicle(vehicle.id)}
+                    className={
+                      selected
+                        ? "relative -mb-px rounded-t-xl border border-border border-b-background bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-sm"
+                        : "rounded-t-xl border border-border/70 bg-muted/60 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                    }
+                  >
+                    {vehicleDisplayName(vehicle.profile)}
+                    {vehicle.active && (
+                      <span className="ml-2 text-[10px] uppercase text-primary">ativo</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-primary">IDENTIFICAÇÃO</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

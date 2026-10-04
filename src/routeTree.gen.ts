@@ -10,13 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiAccountRouteImport } from './routes/api/account'
+import { Route as ApiAuthProfileRouteImport } from './routes/api/auth/profile'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExcluirContaRoute = ExcluirContaRouteImport.update({
+  id: '/excluir-conta',
+  path: '/excluir-conta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -34,39 +42,83 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAccountRoute = ApiAccountRouteImport.update({
+  id: '/api/account',
+  path: '/api/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthProfileRoute = ApiAuthProfileRouteImport.update({
+  id: '/api/auth/profile',
+  path: '/api/auth/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/excluir-conta': typeof ExcluirContaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/api/auth/profile': typeof ApiAuthProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/excluir-conta': typeof ExcluirContaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/api/auth/profile': typeof ApiAuthProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/excluir-conta': typeof ExcluirContaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/api/auth/profile': typeof ApiAuthProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sitemap.xml' | '/api/chat' | '/c/$threadId'
+  fullPaths:
+    | '/'
+    | '/excluir-conta'
+    | '/sitemap.xml'
+    | '/api/account'
+    | '/api/chat'
+    | '/c/$threadId'
+    | '/api/auth/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sitemap.xml' | '/api/chat' | '/c/$threadId'
-  id: '__root__' | '/' | '/sitemap.xml' | '/api/chat' | '/c/$threadId'
+  to:
+    | '/'
+    | '/excluir-conta'
+    | '/sitemap.xml'
+    | '/api/account'
+    | '/api/chat'
+    | '/c/$threadId'
+    | '/api/auth/profile'
+  id:
+    | '__root__'
+    | '/'
+    | '/excluir-conta'
+    | '/sitemap.xml'
+    | '/api/account'
+    | '/api/chat'
+    | '/c/$threadId'
+    | '/api/auth/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ExcluirContaRoute: typeof ExcluirContaRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiAccountRoute: typeof ApiAccountRoute
   ApiChatRoute: typeof ApiChatRoute
   CThreadIdRoute: typeof CThreadIdRoute
+  ApiAuthProfileRoute: typeof ApiAuthProfileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/excluir-conta': {
+      id: '/excluir-conta'
+      path: '/excluir-conta'
+      fullPath: '/excluir-conta'
+      preLoaderRoute: typeof ExcluirContaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -99,14 +158,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/account': {
+      id: '/api/account'
+      path: '/api/account'
+      fullPath: '/api/account'
+      preLoaderRoute: typeof ApiAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/profile': {
+      id: '/api/auth/profile'
+      path: '/api/auth/profile'
+      fullPath: '/api/auth/profile'
+      preLoaderRoute: typeof ApiAuthProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ExcluirContaRoute: ExcluirContaRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiAccountRoute: ApiAccountRoute,
   ApiChatRoute: ApiChatRoute,
   CThreadIdRoute: CThreadIdRoute,
+  ApiAuthProfileRoute: ApiAuthProfileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

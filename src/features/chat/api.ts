@@ -1,63 +1,31 @@
-import { useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { UIMessage } from "ai";
-import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  writeBatch,
-  type DocumentData,
-} from "firebase/firestore";
+import { z } from "zod";
 
-import { getFirebaseAuth, getFirebaseDb } from "@/shared/lib/firebase";
+import { garantirSessao } from "@/features/auth/supabase-auth";
+import type { PapelMensagem } from "@/shared/lib/database.types";
+import { getQueryClient } from "@/shared/lib/query-client";
+import { getSupabase } from "@/shared/lib/supabase";
 import {
   NEW_THREAD_TITLE,
   nextThreadTitle,
   normalizeManualTitle,
-  sanitizeThread,
+  sanitizeMessages,
   type Thread,
 } from "./model";
 
-// Acesso a dados das conversas. A lógica pura (títulos, saneamento) vive em
-// model.ts e é testada lá; aqui só tem I/O e o estado que o React observa.
-//
-// NOTA DE MIGRAÇÃO: este store manual com useSyncExternalStore será substituído
-// por TanStack Query na migração ao Supabase (Fase 2 em docs/ARCHITECTURE.md).
-
 export type { Thread } from "./model";
 
-const LOCAL_STORAGE_KEY = "mecanico-fusca-threads-v1";
+const THREADS_QUERY_KEY = ["threads"] as const;
 const PERSIST_DEBOUNCE_MS = 600;
 
-let threads: Thread[] = [];
-let ready = false;
-let error: Error | null = null;
-let userId: string | null = null;
-let initPromise: Promise<void> | null = null;
-let unsubscribeThreads: (() => void) | null = null;
-
-const listeners = new Set<() => void>();
-// window.setTimeout devolve number no navegador — este store só roda no cliente.
+let currentUserId: string | null = null;
 const pendingWrites = new Map<string, number>();
+
+const messagePartsSchema = z.array(z.unknown());
 
 function isBrowser() {
   return typeof window !== "undefined";
-}
-
-function emit() {
-  for (const listener of listeners) listener();
-}
-
-function setError(nextError: unknown) {
-  error = nextError instanceof Error ? nextError : new Error("Erro ao sincronizar conversas.");
-  emit();
 }
 
 function genId() {
@@ -65,155 +33,118 @@ function genId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function normalizeThread(id: string, data: DocumentData): Thread {
+function toTimestamp(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function normalizeRole(role: string): PapelMensagem {
+  return role === "system" || role === "assistant" ? role : "user";
+}
+
+function normalizeMessage(row: { id: string; papel: string; partes: unknown }): UIMessage {
+  const parsedParts = messagePartsSchema.safeParse(row.partes);
+
   return {
-    id,
-    title: typeof data.title === "string" ? data.title : NEW_THREAD_TITLE,
-    titleEdited: data.titleEdited === true,
-    updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
-    messages: Array.isArray(data.messages) ? (data.messages as UIMessage[]) : [],
+    id: row.id,
+    role: normalizeRole(row.papel),
+    parts: parsedParts.success ? (parsedParts.data as UIMessage["parts"]) : [],
   };
 }
 
-function threadsCollection(uid: string) {
-  return collection(getFirebaseDb(), "users", uid, "threads");
+async function requireUserId() {
+  const user = await garantirSessao();
+  currentUserId = user.id;
+  return user.id;
 }
 
-function threadDoc(uid: string, threadId: string) {
-  return doc(getFirebaseDb(), "users", uid, "threads", threadId);
+function getCachedThreads() {
+  return getQueryClient().getQueryData<Thread[]>(THREADS_QUERY_KEY) ?? [];
 }
 
-async function waitForExistingAuthUser() {
-  const auth = getFirebaseAuth();
-  return new Promise<User | null>((resolve, reject) => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (user) => {
-        unsubscribe();
-        resolve(user);
-      },
-      reject,
-    );
-  });
-}
-
-async function ensureUser() {
-  const auth = getFirebaseAuth();
-  const existing = auth.currentUser ?? (await waitForExistingAuthUser());
-  const user = existing ?? (await signInAnonymously(auth)).user;
-
-  // Só perfil aqui. Entitlements (isAdmin, plano, assinatura) NUNCA são escritos
-  // pelo cliente — quem escreve é o servidor. Ver docs/ARCHITECTURE.md §3.2.
-  await setDoc(
-    doc(getFirebaseDb(), "users", user.uid),
-    {
-      authMode: user.isAnonymous ? "anonymous" : "authenticated",
-      displayName: user.displayName ?? null,
-      email: user.email ?? null,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
+function setCachedThreads(nextThreads: Thread[]) {
+  getQueryClient().setQueryData(
+    THREADS_QUERY_KEY,
+    [...nextThreads].sort((a, b) => b.updatedAt - a.updatedAt),
   );
-
-  return user;
 }
 
-function readLocalThreads(): Thread[] {
-  if (!isBrowser()) return [];
-  try {
-    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Thread[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+function upsertCachedThread(thread: Thread) {
+  const current = getCachedThreads();
+  setCachedThreads([thread, ...current.filter((item) => item.id !== thread.id)]);
 }
 
-async function migrateLocalThreads(uid: string) {
-  if (!isBrowser()) return;
+async function fetchThreads(): Promise<Thread[]> {
+  const uid = await requireUserId();
+  const supabase = getSupabase();
 
-  const migrationKey = `${LOCAL_STORAGE_KEY}-firestore-migrated-${uid}`;
-  if (window.localStorage.getItem(migrationKey)) return;
+  const { data: threadRows, error: threadError } = await supabase
+    .from("threads")
+    .select("id,titulo,titulo_editado,atualizado_em")
+    .eq("user_id", uid)
+    .order("atualizado_em", { ascending: false });
 
-  const localThreads = readLocalThreads();
-  if (localThreads.length === 0) {
-    window.localStorage.setItem(migrationKey, "1");
-    return;
-  }
+  if (threadError) throw threadError;
+  if (!threadRows || threadRows.length === 0) return [];
 
-  const existing = await getDocs(query(threadsCollection(uid), limit(1)));
-  if (existing.empty) {
-    const batch = writeBatch(getFirebaseDb());
-    for (const thread of localThreads) {
-      batch.set(threadDoc(uid, thread.id), sanitizeThread(thread), { merge: true });
-    }
-    await batch.commit();
-    window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+  const threadIds = threadRows.map((thread) => thread.id);
+  const { data: messageRows, error: messageError } = await supabase
+    .from("messages")
+    .select("id,thread_id,papel,partes,criado_em")
+    .in("thread_id", threadIds)
+    .order("criado_em", { ascending: true });
+
+  if (messageError) throw messageError;
+
+  const messagesByThread = new Map<string, UIMessage[]>();
+  for (const row of messageRows ?? []) {
+    const current = messagesByThread.get(row.thread_id) ?? [];
+    current.push(normalizeMessage(row));
+    messagesByThread.set(row.thread_id, current);
   }
 
-  window.localStorage.setItem(migrationKey, "1");
+  return threadRows.map((row) => ({
+    id: row.id,
+    title: row.titulo || NEW_THREAD_TITLE,
+    titleEdited: row.titulo_editado === true,
+    updatedAt: toTimestamp(row.atualizado_em),
+    messages: messagesByThread.get(row.id) ?? [],
+  }));
 }
 
-function subscribeToFirestore(uid: string) {
-  unsubscribeThreads?.();
+async function persistThreadMessages(uid: string, thread: Thread) {
+  const supabase = getSupabase();
+  const sanitized = sanitizeMessages(thread.messages);
 
-  return new Promise<void>((resolve, reject) => {
-    let resolved = false;
-    unsubscribeThreads = onSnapshot(
-      query(threadsCollection(uid), orderBy("updatedAt", "desc")),
-      (snapshot) => {
-        threads = snapshot.docs.map((thread) => normalizeThread(thread.id, thread.data()));
-        ready = true;
-        error = null;
-        emit();
-        if (!resolved) {
-          resolved = true;
-          resolve();
-        }
-      },
-      (snapshotError) => {
-        setError(snapshotError);
-        if (!resolved) {
-          resolved = true;
-          reject(snapshotError);
-        }
-      },
-    );
-  });
-}
+  const { error: threadError } = await supabase
+    .from("threads")
+    .update({ titulo: thread.title, titulo_editado: thread.titleEdited === true })
+    .eq("id", thread.id)
+    .eq("user_id", uid);
 
-async function initializeThreads() {
-  if (!isBrowser()) return;
-  if (initPromise) return initPromise;
+  if (threadError) throw threadError;
 
-  initPromise = (async () => {
-    const user = await ensureUser();
-    userId = user.uid;
-    await migrateLocalThreads(user.uid);
-    await subscribeToFirestore(user.uid);
-  })().catch((nextError) => {
-    setError(nextError);
-    throw nextError;
+  if (sanitized.length === 0) return;
+
+  const rows = sanitized.map((message) => ({
+    id: message.id,
+    thread_id: thread.id,
+    user_id: uid,
+    papel: normalizeRole(message.role),
+    partes: message.parts,
+  }));
+
+  const { error: messageError } = await supabase.from("messages").upsert(rows, {
+    onConflict: "id",
   });
 
-  return initPromise;
-}
-
-async function requireThreadsReady() {
-  await initializeThreads();
-  if (!userId) throw new Error("Usuário Firebase não inicializado.");
-  return userId;
-}
-
-function upsertLocalThread(thread: Thread) {
-  threads = [thread, ...threads.filter((t) => t.id !== thread.id)].sort(
-    (a, b) => b.updatedAt - a.updatedAt,
-  );
-  emit();
+  if (messageError) throw messageError;
 }
 
 function schedulePersistThread(uid: string, thread: Thread) {
+  if (!isBrowser()) return;
+
   const existing = pendingWrites.get(thread.id);
   if (existing) window.clearTimeout(existing);
 
@@ -221,82 +152,87 @@ function schedulePersistThread(uid: string, thread: Thread) {
     thread.id,
     window.setTimeout(() => {
       pendingWrites.delete(thread.id);
-      setDoc(threadDoc(uid, thread.id), sanitizeThread(thread), { merge: true }).catch(setError);
+      persistThreadMessages(uid, thread).catch((error) => {
+        console.error("Erro ao salvar conversa:", error);
+      });
     }, PERSIST_DEBOUNCE_MS),
   );
 }
 
 function clearPendingWrites() {
-  for (const timeout of pendingWrites.values()) {
-    window.clearTimeout(timeout);
-  }
+  if (!isBrowser()) return;
+  for (const timeout of pendingWrites.values()) window.clearTimeout(timeout);
   pendingWrites.clear();
 }
 
 export function getThreads(): Thread[] {
-  void initializeThreads();
-  return threads;
+  return getCachedThreads();
 }
 
 export function getThread(id: string): Thread | undefined {
-  void initializeThreads();
-  return threads.find((t) => t.id === id);
+  return getCachedThreads().find((thread) => thread.id === id);
 }
 
 export function getThreadsError(): Error | null {
-  void initializeThreads();
-  return error;
+  const query = getQueryClient().getQueryCache().find({ queryKey: THREADS_QUERY_KEY });
+  const error = query?.state.error;
+  return error instanceof Error ? error : null;
 }
 
 export function areThreadsReady(): boolean {
-  void initializeThreads();
-  return ready;
+  const query = getQueryClient().getQueryCache().find({ queryKey: THREADS_QUERY_KEY });
+  return query?.state.status === "success";
 }
 
 export function getCurrentThreadUserId(): string | null {
-  void initializeThreads();
-  return userId;
+  return currentUserId;
 }
 
 export async function waitForThreadsReady() {
-  await requireThreadsReady();
+  await getQueryClient().ensureQueryData({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads });
 }
 
 export async function reloadThreadsForCurrentUser() {
-  if (!isBrowser()) return;
-
   clearPendingWrites();
-  unsubscribeThreads?.();
-  unsubscribeThreads = null;
-  initPromise = null;
-  userId = null;
-  threads = [];
-  ready = false;
-  error = null;
-  emit();
-
-  await initializeThreads();
+  currentUserId = null;
+  getQueryClient().removeQueries({ queryKey: THREADS_QUERY_KEY });
+  await waitForThreadsReady();
 }
 
 export async function createThread(): Promise<Thread> {
-  const uid = await requireThreadsReady();
+  const uid = await requireUserId();
+  const now = Date.now();
   const thread: Thread = {
     id: genId(),
     title: NEW_THREAD_TITLE,
     titleEdited: false,
-    updatedAt: Date.now(),
+    updatedAt: now,
     messages: [],
   };
-  upsertLocalThread(thread);
-  await setDoc(threadDoc(uid, thread.id), sanitizeThread(thread), { merge: true });
+
+  upsertCachedThread(thread);
+
+  const { error } = await getSupabase().from("threads").insert({
+    id: thread.id,
+    user_id: uid,
+    titulo: thread.title,
+    titulo_editado: false,
+  });
+
+  if (error) {
+    setCachedThreads(getCachedThreads().filter((item) => item.id !== thread.id));
+    throw error;
+  }
+
   return thread;
 }
 
 export async function ensureThread(id: string): Promise<Thread> {
-  const uid = await requireThreadsReady();
-  const existing = threads.find((t) => t.id === id);
+  await waitForThreadsReady();
+  const existing = getThread(id);
   if (existing) return existing;
 
+  const uid = await requireUserId();
   const thread: Thread = {
     id,
     title: NEW_THREAD_TITLE,
@@ -304,95 +240,89 @@ export async function ensureThread(id: string): Promise<Thread> {
     updatedAt: Date.now(),
     messages: [],
   };
-  upsertLocalThread(thread);
-  await setDoc(threadDoc(uid, thread.id), sanitizeThread(thread), { merge: true });
+
+  upsertCachedThread(thread);
+
+  const { error } = await getSupabase().from("threads").insert({
+    id,
+    user_id: uid,
+    titulo: NEW_THREAD_TITLE,
+    titulo_editado: false,
+  });
+
+  if (error) throw error;
   return thread;
 }
 
 export async function deleteThread(id: string) {
-  const uid = await requireThreadsReady();
-  const existing = threads;
-  threads = threads.filter((t) => t.id !== id);
-  emit();
+  const previousThreads = getCachedThreads();
+  setCachedThreads(previousThreads.filter((thread) => thread.id !== id));
 
-  try {
-    await deleteDoc(threadDoc(uid, id));
-  } catch (nextError) {
-    threads = existing;
-    setError(nextError);
-    throw nextError;
+  const { error } = await getSupabase().from("threads").delete().eq("id", id);
+  if (error) {
+    setCachedThreads(previousThreads);
+    throw error;
   }
 }
 
 export async function updateThreadTitle(id: string, title: string) {
-  const uid = await requireThreadsReady();
-  const idx = threads.findIndex((t) => t.id === id);
-  if (idx === -1) throw new Error("Conversa não encontrada.");
+  const thread = getThread(id);
+  if (!thread) throw new Error("Conversa não encontrada.");
 
-  const pendingWrite = pendingWrites.get(id);
-  if (pendingWrite) {
-    window.clearTimeout(pendingWrite);
-    pendingWrites.delete(id);
-  }
-
-  const previousThreads = threads;
+  const previousThreads = getCachedThreads();
   const updated: Thread = {
-    ...threads[idx],
+    ...thread,
     title: normalizeManualTitle(title),
     titleEdited: true,
+    updatedAt: Date.now(),
   };
 
-  upsertLocalThread(updated);
+  upsertCachedThread(updated);
 
-  try {
-    await setDoc(threadDoc(uid, id), sanitizeThread(updated), { merge: true });
-  } catch (nextError) {
-    threads = previousThreads;
-    setError(nextError);
-    throw nextError;
+  const { error } = await getSupabase()
+    .from("threads")
+    .update({ titulo: updated.title, titulo_editado: true })
+    .eq("id", id);
+
+  if (error) {
+    setCachedThreads(previousThreads);
+    throw error;
   }
 }
 
 export function saveThreadMessages(id: string, messages: UIMessage[]) {
-  if (!userId) return;
+  const uid = currentUserId;
+  if (!uid) return;
 
-  const idx = threads.findIndex((t) => t.id === id);
-  if (idx === -1) return;
+  const thread = getThread(id);
+  if (!thread) return;
 
-  const existing = threads[idx];
   const updated: Thread = {
-    ...existing,
+    ...thread,
     messages,
-    title: nextThreadTitle(existing, messages),
+    title: nextThreadTitle(thread, messages),
     updatedAt: Date.now(),
   };
 
-  upsertLocalThread(updated);
-  schedulePersistThread(userId, updated);
-}
-
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  void initializeThreads();
-  return () => listeners.delete(cb);
+  upsertCachedThread(updated);
+  schedulePersistThread(uid, updated);
 }
 
 export function useThreads(): Thread[] {
-  return useSyncExternalStore(subscribe, getThreads, () => threads);
+  return useQuery({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads }).data ?? [];
 }
 
 export function useThread(id: string): Thread | undefined {
-  return useSyncExternalStore(
-    subscribe,
-    () => getThread(id),
-    () => threads.find((thread) => thread.id === id),
-  );
+  const { data } = useQuery({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads });
+  return data?.find((thread) => thread.id === id);
 }
 
 export function useThreadsReady(): boolean {
-  return useSyncExternalStore(subscribe, areThreadsReady, () => ready);
+  const query = useQuery({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads });
+  return query.isSuccess;
 }
 
 export function useThreadsError(): Error | null {
-  return useSyncExternalStore(subscribe, getThreadsError, () => error);
+  const query = useQuery({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads });
+  return query.error instanceof Error ? query.error : null;
 }

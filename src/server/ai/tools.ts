@@ -7,7 +7,7 @@ import { SISTEMAS } from "./schema";
 //
 // registrarEvento é deliberadamente definida SEM `execute`: no AI SDK isso a
 // torna uma ferramenta de cliente. O agente decide chamar, mas quem escreve é o
-// navegador — que é onde existe a sessão autenticada do Firestore. O servidor
+// navegador — que é onde existe a sessão autenticada do Supabase. O servidor
 // não tem credencial de administrador e não deveria ter só para isso.
 
 export const registrarEventoTool = tool({

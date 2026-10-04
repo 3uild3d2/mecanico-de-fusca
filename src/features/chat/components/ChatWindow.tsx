@@ -33,20 +33,31 @@ import { extractEstadoDiagnostico, type EstadoDiagnostico } from "@/features/cha
 import { useActiveVehicle } from "@/features/garage/api";
 import { registrarEvento, useVehicleEvents } from "@/features/garage/events-api";
 import type { VehicleEvent } from "@/features/garage/events";
-import fuscaLogo from "@/assets/fusca-logo.jpg";
+import fuscaLogo from "@/assets/fusca-logo.png";
+import contaGirosNiveis from "@/assets/conta_giros_4_niveis.png";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
 const SUGGESTIONS = [
-  "Meu Fusca está esquentando demais, o que pode ser?",
-  "Como faço a regulagem das válvulas?",
-  "Está difícil dar partida de manhã, o que verifico?",
-  "Qual o ponto de ignição ideal do motor 1600?",
+  { level: 1, text: "Meu fusca falha quando acelero" },
+  { level: 2, text: "Como troco a correia dentada da Brasília?" },
+  { level: 3, text: "Qual o torque de aperto do cabeçote do 1500?" },
+  { level: 4, text: "Como definir a sobremedida externa das bronzinas?" },
 ];
 
 const ACCEPTED_MEDIA = "image/*,audio/*";
 const MAX_ATTACHMENT_SIZE = 15 * 1024 * 1024;
 const DIA_MS = 24 * 60 * 60 * 1000;
+const DIFFICULTY_SPRITE_WIDTH = 2720;
+const DIFFICULTY_SPRITE_HEIGHT = 672;
+const DIFFICULTY_ICON_HEIGHT = 64;
+const DIFFICULTY_ICON_SLOT_WIDTH = 132;
+const DIFFICULTY_CROPS = [
+  { x: 252, y: 164, width: 410, height: 212 },
+  { x: 848, y: 164, width: 408, height: 212 },
+  { x: 1444, y: 164, width: 423, height: 212 },
+  { x: 2052, y: 164, width: 415, height: 212 },
+] as const;
 
 /** Espelha o inputSchema de registrarEvento em src/server/ai/tools.ts. */
 type RegistrarEventoInput = {
@@ -87,6 +98,35 @@ function removeLocalFileHandles(files: SubmitFile[]): FileUIPart[] {
 
 function isLocalDevOrigin() {
   return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
+function DifficultyIcon({ level }: { level: number }) {
+  const crop = DIFFICULTY_CROPS[level - 1] ?? DIFFICULTY_CROPS[0];
+  const scale = DIFFICULTY_ICON_HEIGHT / crop.height;
+  const iconWidth = crop.width * scale;
+  const centeredOffset = (DIFFICULTY_ICON_SLOT_WIDTH - iconWidth) / 2;
+
+  return (
+    <span
+      aria-hidden
+      className="relative shrink-0 overflow-hidden"
+      style={{
+        height: DIFFICULTY_ICON_HEIGHT,
+        width: DIFFICULTY_ICON_SLOT_WIDTH,
+      }}
+    >
+      <img
+        alt=""
+        className="absolute left-0 top-0 max-w-none"
+        src={contaGirosNiveis}
+        style={{
+          height: DIFFICULTY_SPRITE_HEIGHT * scale,
+          transform: `translate(${centeredOffset - crop.x * scale}px, ${-crop.y * scale}px)`,
+          width: DIFFICULTY_SPRITE_WIDTH * scale,
+        }}
+      />
+    </span>
+  );
 }
 
 function MessageFiles({ files }: { files: FileUIPart[] }) {
@@ -281,7 +321,7 @@ export function ChatWindow({
     // sintoma é uma bolha de assistente vazia e um único POST em /api/chat.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     // Ferramentas de cliente: o agente decide, o navegador executa — é aqui que
-    // existe a sessão autenticada do Firestore.
+    // existe a sessão autenticada do Supabase.
     onToolCall: async ({ toolCall }) => {
       // atualizarHipoteses não tem efeito colateral: o estado é derivado das
       // partes da mensagem. Só precisa devolver resultado para o SDK seguir.
@@ -434,15 +474,16 @@ export function ChatWindow({
                   gente diagnostica juntos.
                 </p>
               </div>
-              <div className="mt-2 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-                {SUGGESTIONS.map((s) => (
+              <div className="mt-2 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-4">
+                {SUGGESTIONS.map((suggestion) => (
                   <button
-                    key={s}
+                    key={suggestion.text}
                     type="button"
-                    onClick={() => sendSuggestion(s)}
-                    className="rounded-lg border border-border bg-card px-3 py-2.5 text-left text-sm text-card-foreground transition-colors hover:border-primary hover:bg-secondary"
+                    onClick={() => sendSuggestion(suggestion.text)}
+                    className="flex min-h-24 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left text-sm text-card-foreground transition-colors hover:border-primary hover:bg-secondary"
                   >
-                    {s}
+                    <DifficultyIcon level={suggestion.level} />
+                    <span>{suggestion.text}</span>
                   </button>
                 ))}
               </div>

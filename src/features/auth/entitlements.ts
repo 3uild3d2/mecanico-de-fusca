@@ -1,19 +1,11 @@
-import { useSyncExternalStore } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { useQuery } from "@tanstack/react-query";
 
-import { getFirebaseDb } from "@/shared/lib/firebase";
-import { getCurrentThreadUserId, waitForThreadsReady } from "@/features/chat/api";
+import { garantirSessao } from "@/features/auth/supabase-auth";
+import { getSupabase } from "@/shared/lib/supabase";
 
 /**
- * Direitos de acesso do usuário (admin hoje; plano e assinatura na Fase 5).
- *
- * Regra inegociável: o cliente apenas LÊ daqui. Antes, o navegador comparava o
- * e-mail com uma constante e gravava `isAdmin` no próprio documento — ou seja, o
- * cliente escrevia o próprio direito de acesso. Com assinatura isso viraria uma
- * falha de receita. Ver docs/ARCHITECTURE.md §3.2.
- *
- * Quem escreve estes campos é o servidor. As regras do Firestore
- * (firestore.rules) tornam o documento somente-leitura para o dono.
+ * Direitos de acesso do usuário. O cliente apenas lê; `is_admin` e `plan` são
+ * protegidos no banco por RLS + GRANT de coluna.
  */
 
 export type Entitlements = {
@@ -22,64 +14,33 @@ export type Entitlements = {
 };
 
 const ANONYMOUS_ENTITLEMENTS: Entitlements = { isAdmin: false, plan: "free" };
+const ENTITLEMENTS_QUERY_KEY = ["entitlements"] as const;
 
-let entitlements: Entitlements = ANONYMOUS_ENTITLEMENTS;
-let ready = false;
-let unsubscribe: (() => void) | null = null;
+async function fetchEntitlements(): Promise<Entitlements> {
+  const user = await garantirSessao();
+  const { data, error } = await getSupabase()
+    .from("profiles")
+    .select("is_admin,plan")
+    .eq("id", user.id)
+    .maybeSingle();
 
-const listeners = new Set<() => void>();
+  if (error) throw error;
 
-function emit() {
-  for (const listener of listeners) listener();
-}
-
-async function initialize() {
-  await waitForThreadsReady();
-  const uid = getCurrentThreadUserId();
-  if (!uid) return;
-
-  unsubscribe?.();
-
-  unsubscribe = onSnapshot(
-    doc(getFirebaseDb(), "users", uid),
-    (snapshot) => {
-      const data = snapshot.data();
-      entitlements = {
-        isAdmin: data?.isAdmin === true,
-        plan: data?.plan === "premium" ? "premium" : "free",
-      };
-      ready = true;
-      emit();
-    },
-    (error) => {
-      console.error("Erro ao carregar permissões:", error);
-      entitlements = ANONYMOUS_ENTITLEMENTS;
-      ready = true;
-      emit();
-    },
-  );
-}
-
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  if (!unsubscribe) void initialize();
-  return () => listeners.delete(cb);
+  return {
+    isAdmin: data?.is_admin === true,
+    plan: data?.plan === "premium" ? "premium" : "free",
+  };
 }
 
 export function useEntitlements(): Entitlements {
-  return useSyncExternalStore(
-    subscribe,
-    () => entitlements,
-    () => entitlements,
+  return (
+    useQuery({ queryKey: ENTITLEMENTS_QUERY_KEY, queryFn: fetchEntitlements }).data ??
+    ANONYMOUS_ENTITLEMENTS
   );
 }
 
 export function useEntitlementsReady(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => ready,
-    () => ready,
-  );
+  return useQuery({ queryKey: ENTITLEMENTS_QUERY_KEY, queryFn: fetchEntitlements }).isSuccess;
 }
 
 export function useIsAdmin(): boolean {

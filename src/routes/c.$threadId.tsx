@@ -31,7 +31,7 @@ function ThreadPage() {
         await ensureThread(threadId);
         if (!cancelled) setReady(true);
       } catch {
-        toast.error("Não foi possível carregar esta conversa do Firebase.");
+        toast.error("Não foi possível carregar esta conversa.");
       }
     }
 

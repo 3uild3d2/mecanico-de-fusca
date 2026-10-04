@@ -5,6 +5,8 @@ import { z } from "zod";
 
 const serverEnvSchema = z.object({
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1, "GOOGLE_GENERATIVE_AI_API_KEY é obrigatória"),
+  VITE_SUPABASE_URL: z.string().url("VITE_SUPABASE_URL precisa ser uma URL válida"),
+  SUPABASE_SECRET_KEY: z.string().min(1, "SUPABASE_SECRET_KEY é obrigatória"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

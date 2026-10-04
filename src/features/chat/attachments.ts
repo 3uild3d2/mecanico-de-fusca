@@ -1,11 +1,10 @@
 import type { FileUIPart } from "ai";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { getFirebaseStorage } from "@/shared/lib/firebase";
-import { getCurrentThreadUserId, waitForThreadsReady } from "./api";
+import { garantirSessao } from "@/features/auth/supabase-auth";
+import { getSupabase } from "@/shared/lib/supabase";
 
 const ALLOWED_MEDIA_PREFIXES = ["image/", "audio/"];
-const RETENTION_HOURS = 48;
+const BUCKET = "anexos";
 
 type UploadableChatFile = FileUIPart & { sourceFile?: File };
 
@@ -27,13 +26,8 @@ function dataUrlToBlob(dataUrl: string) {
 }
 
 export async function uploadChatFiles(threadId: string, files: UploadableChatFile[]) {
-  await waitForThreadsReady();
-  const uid = getCurrentThreadUserId();
-  if (!uid) {
-    throw new Error("Usuário Firebase não inicializado para upload de anexos.");
-  }
-
-  const storage = getFirebaseStorage();
+  const user = await garantirSessao();
+  const supabase = getSupabase();
 
   return Promise.all(
     files.map(async (file, index): Promise<FileUIPart> => {
@@ -55,18 +49,27 @@ export async function uploadChatFiles(threadId: string, files: UploadableChatFil
       const extension = file.mediaType?.split("/")[1]?.split(";")[0] ?? "bin";
       const fallback = `attachment-${index}.${extension}`;
       const filename = safeFileName(file.filename, fallback);
-      const path = `users/${uid}/threads/${threadId}/attachments/${Date.now()}-${index}-${filename}`;
-      // A lifecycle rule do bucket é quem apaga de fato; este metadado documenta a intenção.
-      const expiresAt = new Date(Date.now() + RETENTION_HOURS * 60 * 60 * 1000).toISOString();
+      const path = `${user.id}/${threadId}/${crypto.randomUUID()}-${filename}`;
 
-      const snapshot = await uploadBytes(ref(storage, path), blob, {
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, blob, {
         contentType: file.mediaType,
-        customMetadata: { expiresAt, threadId, uid },
+        upsert: false,
       });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+      const { error: rowError } = await supabase.from("attachments").insert({
+        user_id: user.id,
+        caminho: path,
+        media_type: file.mediaType ?? "application/octet-stream",
+        bytes: blob.size,
+      });
+      if (rowError) throw rowError;
 
       return {
         ...serializableFile,
-        url: await getDownloadURL(snapshot.ref),
+        url: data.publicUrl,
       };
     }),
   );

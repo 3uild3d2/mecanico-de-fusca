@@ -23,10 +23,16 @@ import {
   useThreadsReady,
   type Thread,
 } from "@/features/chat/api";
-import { signInWithGoogle, signOutToAnonymous, useAuthUser } from "@/features/auth/api";
+import {
+  deleteCurrentAccount,
+  signInWithGoogle,
+  signOutToAnonymous,
+  useAuthUser,
+} from "@/features/auth/api";
 import { useIsAdmin } from "@/features/auth/entitlements";
+import { ehAnonimo, nomeExibicao } from "@/features/auth/supabase-auth";
 import { VehicleProfileDialog } from "@/features/garage/components/VehicleProfileDialog";
-import fuscaLogo from "@/assets/fusca-logo.jpg";
+import fuscaLogo from "@/assets/fusca-logo.png";
 
 export function ChatSidebar({
   activeThreadId,
@@ -43,10 +49,8 @@ export function ChatSidebar({
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [savingTitleId, setSavingTitleId] = useState<string | null>(null);
-  const isSignedIn = Boolean(user && !user.isAnonymous);
-  const displayName = isSignedIn
-    ? (user?.displayName ?? user?.email ?? "Conta Google")
-    : "Visitante";
+  const isSignedIn = Boolean(user && !ehAnonimo(user));
+  const displayName = nomeExibicao(user);
 
   const handleNew = async () => {
     try {
@@ -102,8 +106,9 @@ export function ChatSidebar({
       await signInWithGoogle();
       toast.success("Login com Google realizado.");
       navigate({ to: "/" });
-    } catch {
-      toast.error("Não foi possível entrar com Google.");
+    } catch (error) {
+      console.error("Erro no login com Google:", error);
+      toast.error(error instanceof Error ? error.message : "Não foi possível entrar com Google.");
     }
   };
 
@@ -114,6 +119,21 @@ export function ChatSidebar({
       navigate({ to: "/" });
     } catch {
       toast.error("Não foi possível sair da conta Google.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Apagar sua conta? Isso remove conversas, ficha do veículo, histórico e anexos. Esta ação não pode ser desfeita.",
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCurrentAccount();
+      toast.success("Conta apagada.");
+      navigate({ to: "/" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível apagar a conta.");
     }
   };
 
@@ -259,14 +279,24 @@ export function ChatSidebar({
           </div>
         </div>
         {isSignedIn ? (
-          <button
-            type="button"
-            onClick={() => void handleSignOut()}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
-          >
-            <LogOut className="size-4" />
-            Sair
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+            >
+              <LogOut className="size-4" />
+              Sair
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteAccount()}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+            >
+              <Trash2 className="size-4" />
+              Apagar conta
+            </button>
+          </div>
         ) : (
           <button
             type="button"

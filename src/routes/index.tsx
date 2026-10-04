@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { createThread, getThreads, waitForThreadsReady } from "@/features/chat/api";
-import fuscaLogo from "@/assets/fusca-logo.jpg";
+import fuscaLogo from "@/assets/fusca-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,7 +48,7 @@ function Index() {
           replace: true,
         });
       } catch {
-        toast.error("Não foi possível carregar suas conversas do Firebase.");
+        toast.error("Não foi possível carregar suas conversas.");
       }
     }
 

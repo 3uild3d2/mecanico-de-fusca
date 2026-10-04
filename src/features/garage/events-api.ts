@@ -1,81 +1,67 @@
-import { useSyncExternalStore } from "react";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  setDoc,
-  type DocumentData,
-} from "firebase/firestore";
+import { useQuery } from "@tanstack/react-query";
 
-import { getFirebaseDb } from "@/shared/lib/firebase";
-import { getCurrentThreadUserId, waitForThreadsReady } from "@/features/chat/api";
+import { garantirSessao } from "@/features/auth/supabase-auth";
+import type { VehicleEventRow } from "@/shared/lib/database.types";
+import { getQueryClient } from "@/shared/lib/query-client";
+import { getSupabase } from "@/shared/lib/supabase";
+import { getActiveVehicleRecord, initializeVehicles } from "./api";
 import { normalizeTitulo, type VehicleEvent } from "./events";
 
-// Persistência do histórico do veículo. Lógica pura em events.ts.
-//
-// NOTA DE MIGRAÇÃO: hoje em Firestore, vira a tabela vehicle_events no Postgres
-// na Fase 2. Só este arquivo é reescrito — events.ts é portável.
-
-let events: VehicleEvent[] = [];
-let ready = false;
-let unsubscribe: (() => void) | null = null;
-
-const listeners = new Set<() => void>();
-
-function emit() {
-  for (const listener of listeners) listener();
-}
-
-function eventsCollection(uid: string) {
-  return collection(getFirebaseDb(), "users", uid, "vehicleEvents");
-}
-
-function normalizeEvent(id: string, data: DocumentData): VehicleEvent {
-  return {
-    id,
-    tipo: data.tipo ?? "observacao",
-    titulo: typeof data.titulo === "string" ? data.titulo : "(sem título)",
-    sistema: data.sistema ?? undefined,
-    desfecho: data.desfecho ?? undefined,
-    data: typeof data.data === "number" ? data.data : 0,
-    km: typeof data.km === "number" ? data.km : undefined,
-    threadId: data.threadId ?? undefined,
-    origem: data.origem === "usuario" ? "usuario" : "agente",
-    criadoEm: typeof data.criadoEm === "number" ? data.criadoEm : 0,
-  };
-}
-
-export async function initializeEvents() {
-  await waitForThreadsReady();
-  const uid = getCurrentThreadUserId();
-  if (!uid) return;
-
-  unsubscribe?.();
-
-  unsubscribe = onSnapshot(
-    query(eventsCollection(uid), orderBy("data", "desc")),
-    (snapshot) => {
-      events = snapshot.docs.map((d) => normalizeEvent(d.id, d.data()));
-      ready = true;
-      emit();
-    },
-    (error) => {
-      console.error("Erro ao carregar histórico do veículo:", error);
-      ready = true;
-      emit();
-    },
-  );
-}
+export const VEHICLE_EVENTS_QUERY_KEY = ["vehicle-events"] as const;
 
 export type NovoEvento = Omit<VehicleEvent, "id" | "criadoEm"> & { id?: string };
 
-export async function registrarEvento(evento: NovoEvento): Promise<VehicleEvent> {
-  const uid = getCurrentThreadUserId();
-  if (!uid) throw new Error("Usuário não autenticado");
+async function requireUserId() {
+  return (await garantirSessao()).id;
+}
 
+function toTimestamp(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function normalizeEvent(row: VehicleEventRow): VehicleEvent {
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    titulo: row.titulo,
+    sistema: row.sistema ?? undefined,
+    desfecho: row.desfecho ?? undefined,
+    data: toTimestamp(row.data_evento),
+    km: row.km ?? undefined,
+    threadId: row.thread_id ?? undefined,
+    origem: row.origem,
+    criadoEm: toTimestamp(row.criado_em),
+  };
+}
+
+async function fetchVehicleEvents(): Promise<VehicleEvent[]> {
+  const uid = await requireUserId();
+  const { data, error } = await getSupabase()
+    .from("vehicle_events")
+    .select("*")
+    .eq("user_id", uid)
+    .order("data_evento", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(normalizeEvent);
+}
+
+export async function initializeEvents() {
+  await getQueryClient().ensureQueryData({
+    queryKey: VEHICLE_EVENTS_QUERY_KEY,
+    queryFn: fetchVehicleEvents,
+  });
+}
+
+async function getActiveVehicleId() {
+  await initializeVehicles();
+  return getActiveVehicleRecord()?.id ?? null;
+}
+
+export async function registrarEvento(evento: NovoEvento): Promise<VehicleEvent> {
+  const uid = await requireUserId();
   const registro: VehicleEvent = {
     ...evento,
     id: evento.id ?? crypto.randomUUID(),
@@ -83,39 +69,53 @@ export async function registrarEvento(evento: NovoEvento): Promise<VehicleEvent>
     criadoEm: Date.now(),
   };
 
-  // Firestore rejeita undefined; remove antes de gravar.
-  const payload = Object.fromEntries(
-    Object.entries(registro).filter(([, value]) => value !== undefined),
+  const payload = {
+    id: registro.id,
+    vehicle_id: await getActiveVehicleId(),
+    user_id: uid,
+    tipo: registro.tipo,
+    titulo: registro.titulo,
+    sistema: registro.sistema ?? null,
+    desfecho: registro.desfecho ?? null,
+    data_evento: new Date(registro.data).toISOString(),
+    km: registro.km ?? null,
+    thread_id: registro.threadId ?? null,
+    origem: registro.origem,
+  };
+
+  const { error } = await getSupabase().from("vehicle_events").upsert(payload, {
+    onConflict: "id",
+  });
+  if (error) throw error;
+
+  const queryClient = getQueryClient();
+  queryClient.setQueryData<VehicleEvent[]>(VEHICLE_EVENTS_QUERY_KEY, (current = []) =>
+    [registro, ...current.filter((item) => item.id !== registro.id)].sort(
+      (a, b) => b.data - a.data,
+    ),
   );
 
-  await setDoc(doc(eventsCollection(uid), registro.id), payload, { merge: true });
   return registro;
 }
 
 export async function removerEvento(id: string) {
-  const uid = getCurrentThreadUserId();
-  if (!uid) throw new Error("Usuário não autenticado");
-  await deleteDoc(doc(eventsCollection(uid), id));
-}
+  const previous = getQueryClient().getQueryData<VehicleEvent[]>(VEHICLE_EVENTS_QUERY_KEY) ?? [];
+  getQueryClient().setQueryData<VehicleEvent[]>(
+    VEHICLE_EVENTS_QUERY_KEY,
+    previous.filter((event) => event.id !== id),
+  );
 
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  if (!unsubscribe) void initializeEvents();
-  return () => listeners.delete(cb);
+  const { error } = await getSupabase().from("vehicle_events").delete().eq("id", id);
+  if (error) {
+    getQueryClient().setQueryData(VEHICLE_EVENTS_QUERY_KEY, previous);
+    throw error;
+  }
 }
 
 export function useVehicleEvents(): VehicleEvent[] {
-  return useSyncExternalStore(
-    subscribe,
-    () => events,
-    () => events,
-  );
+  return useQuery({ queryKey: VEHICLE_EVENTS_QUERY_KEY, queryFn: fetchVehicleEvents }).data ?? [];
 }
 
 export function useVehicleEventsReady(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => ready,
-    () => ready,
-  );
+  return useQuery({ queryKey: VEHICLE_EVENTS_QUERY_KEY, queryFn: fetchVehicleEvents }).isSuccess;
 }

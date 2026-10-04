@@ -182,8 +182,8 @@ export function nextThreadTitle(
 
 /**
  * Remove anexos locais (data:/blob:) antes de persistir: são pesados, efêmeros e
- * já foram enviados ao Storage. O clone via JSON também elimina undefined, que o
- * Firestore rejeita.
+ * já foram enviados ao Storage. O clone via JSON também elimina undefined antes
+ * de persistir.
  */
 export function sanitizeMessages(messages: UIMessage[]): UIMessage[] {
   const sanitized = messages.map((message) => ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FUSCA_OPTIONS, formatVehicleSpecs, normalizeVehicle } from "./model";
+import { FUSCA_OPTIONS, formatVehicleSpecs, normalizeVehicle, vehicleDisplayName } from "./model";
 
 describe("normalizeVehicle", () => {
   it("preenche ignição e sistema elétrico com o padrão", () => {
@@ -58,6 +58,25 @@ describe("formatVehicleSpecs", () => {
   it("omite campos vazios", () => {
     const specs = formatVehicleSpecs({ apelido: "Besouro", modelo: "", ano: "   " });
     expect(specs).toBe("Apelido: Besouro");
+  });
+
+  it("inclui modificações no contexto do agente", () => {
+    const specs = formatVehicleSpecs({ modificacoes: "Comando bravo e escapamento dimensionado" });
+    expect(specs).toBe("Modificações: Comando bravo e escapamento dimensionado");
+  });
+});
+
+describe("vehicleDisplayName", () => {
+  it("usa o apelido como nome principal", () => {
+    expect(vehicleDisplayName({ apelido: "Besouro", modelo: "Fusca 1600" })).toBe("Besouro");
+  });
+
+  it("usa modelo e ano quando não há apelido", () => {
+    expect(vehicleDisplayName({ modelo: "Fusca 1300", ano: "1974" })).toBe("Fusca 1300 1974");
+  });
+
+  it("tem fallback curto para aba sem nome", () => {
+    expect(vehicleDisplayName({})).toBe("Fusca");
   });
 });
 

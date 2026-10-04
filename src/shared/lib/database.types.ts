@@ -90,6 +90,17 @@ export type MessageRow = {
   criado_em: string;
 };
 
+export type AttachmentRow = {
+  id: string;
+  message_id: string | null;
+  user_id: string;
+  caminho: string;
+  media_type: string;
+  bytes: number | null;
+  expira_em: string;
+  criado_em: string;
+};
+
 export type SubscriptionRow = {
   user_id: string;
   plano: Plano;
@@ -108,6 +119,11 @@ type Tabela<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
+type Funcao<Args, Returns> = {
+  Args: Args;
+  Returns: Returns;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -116,10 +132,13 @@ export type Database = {
       vehicle_events: Tabela<VehicleEventRow>;
       threads: Tabela<ThreadRow>;
       messages: Tabela<MessageRow>;
+      attachments: Tabela<AttachmentRow>;
       subscriptions: Tabela<SubscriptionRow>;
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      apagar_conta: Funcao<{ alvo: string }, void>;
+    };
     Enums: {
       plano: Plano;
       tipo_evento: TipoEvento;
