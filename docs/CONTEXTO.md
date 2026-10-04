@@ -43,6 +43,7 @@ Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no 
 - **Só existe o perfil do dono para migrar** — decisão dele: sem script de migração de dados, começar limpo no Supabase.
 - **Lixo de teste no banco:** 3+ usuários anônimos e uma thread "Fusca esquentando", criados pelos testes de RLS. Limpar quando conveniente (Dashboard → Authentication → Users).
 - **Branch:** `reestruturacao-fase-1`, com remote em `github.com/3uild3d2/mecanico-de-fusca`. O bloco da fundação Supabase foi commitado e enviado em 2026-07-26; a troca da camada de dados ficou só local até 2026-10-04, quando foi commitada e enviada (`8f5d44c`).
+- **Publicação:** o app nunca foi publicado; roda só no computador do dono. Ele quer publicar na **Vercel** — só depois da etapa 3 do plano (sessão obrigatória e limite de uso no `/api/chat`), senão qualquer um com o endereço gasta as chaves de modelo dele.
 - **Plano gratuito do Supabase pausa o projeto após 7 dias sem uso** e remove o DNS dele. Ficou pausado de agosto até 2026-10-03, quando o dono reativou pelo dashboard (dados intactos). Sintoma de pausa: `ERR_NAME_NOT_RESOLVED` / "o nome DNS não existe".
 
 **Decisões do RAG já tomadas (Fase 3):** embeddings `gemini-embedding-001` a **768 dimensões** — já gravado no schema (`chunks.embedding vector(768)`). Conteúdo será pesquisado e redigido em conjunto com o dono, em markdown com front matter dentro do repositório, começando por um tópico piloto.
@@ -54,8 +55,6 @@ Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
 
 - **Gemini respondendo 403 "Your project has been denied access"** (desde 2026-10-04). Uma chamada passou e, minutos depois, todas as seguintes falharam com `PERMISSION_DENIED` vindo de `generativelanguage.googleapis.com`. É bloqueio na conta Google AI Studio / Google Cloud, não no código. É o modelo de produção: enquanto durar, o chat não responde com o padrão.
-
-- **`OPENAI_API_KEY` vem de uma variável de ambiente do Windows**, não do `.env` do projeto (descoberto em 2026-10-04). Ou seja, o app usaria a conta de outra ferramenta sem ninguém ter escolhido isso. Nenhuma chamada à OpenAI foi feita até o dono decidir qual chave o Mecânico usa. Atenção: se ele puser uma chave no `.env`, confirmar qual das duas prevalece — carregadores de `.env` costumam *não* sobrescrever variável que já existe no ambiente.
 
 - **Histórico do carro misturado entre veículos** (achado em 2026-10-04, etapa 4 do plano). `vehicle_events` grava `vehicle_id`, mas `events-api.ts` carrega por `user_id` só; e `threads` não tem `vehicle_id`, então a conversa usa a ficha do veículo *ativo na garagem*, não a do carro dela. Com Fusca e Brasília cadastrados, a bobina trocada num entra no contexto do outro, e reabrir uma conversa antiga com outro carro selecionado troca a ficha.
 
@@ -94,6 +93,10 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-10-04 — Chave da OpenAI com nome próprio: `MECANICO_OPENAI_API_KEY`
+
+Nesta máquina existe uma `OPENAI_API_KEY` de outra ferramenta nas variáveis do Windows, e o app a enxergava sem ninguém ter escolhido. O dono decidiu: o Mecânico usa uma chave **só dele**, de um projeto próprio na OpenAI, para separar custo e limite. **Descartado:** manter `OPENAI_API_KEY` e confiar que o `.env` prevalece — carregadores de `.env` costumam não sobrescrever variável já existente no ambiente, então a chave errada venceria calada. Com nome próprio não há precedência a acertar. Verificado: sem `MECANICO_OPENAI_API_KEY`, `/api/modelos` oferece só o Gemini.
 
 ### 2026-10-04 — Seletor de modelos para o benchmark (temporário)
 
