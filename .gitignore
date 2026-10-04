@@ -33,3 +33,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Resultados da bateria de avaliação: gerados, não versionados
+avaliacao/resultados/
