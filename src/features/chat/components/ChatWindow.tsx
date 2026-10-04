@@ -28,9 +28,17 @@ import {
 } from "@/features/chat/components/prompt-input";
 import { Shimmer } from "@/features/chat/components/shimmer";
 import { uploadChatFiles } from "@/features/chat/attachments";
-import { getThread, saveThreadMessages, useThread } from "@/features/chat/api";
+import {
+  getThread,
+  lerModeloEscolhido,
+  salvarModeloEscolhido,
+  saveThreadMessages,
+  useSeletorModelos,
+  useThread,
+} from "@/features/chat/api";
+import { SeletorModelo } from "@/features/chat/components/SeletorModelo";
 import { extractEstadoDiagnostico, type EstadoDiagnostico } from "@/features/chat/hipoteses";
-import { recorteParaEnvio } from "@/features/chat/model";
+import { formatarMedicao, lerMedicao, recorteParaEnvio } from "@/features/chat/model";
 import { useActiveVehicle } from "@/features/garage/api";
 import { registrarEvento, useVehicleEvents } from "@/features/garage/events-api";
 import type { VehicleEvent } from "@/features/garage/events";
@@ -217,6 +225,17 @@ function PromptAttachmentPreview() {
   );
 }
 
+/** Selo do benchmark: modelo, tempo e tokens. Some sem o seletor ligado. */
+function SeloMedicao({ metadata }: { metadata: unknown }) {
+  const medicao = lerMedicao(metadata);
+  if (!medicao) return null;
+  return (
+    <p className="mt-2 text-[11px] tabular-nums text-muted-foreground">
+      {formatarMedicao(medicao)}
+    </p>
+  );
+}
+
 function AudioRecorderButton({ disabled }: { disabled?: boolean }) {
   const attachments = usePromptInputAttachments();
   const [isRecording, setIsRecording] = useState(false);
@@ -387,9 +406,22 @@ export function ChatWindow({
 
   const isLoading = status === "submitted" || status === "streaming";
 
+  // Seletor do benchmark: só existe quando o servidor diz que está ligado.
+  const seletor = useSeletorModelos();
+  const [modeloEscolhido, setModeloEscolhido] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : lerModeloEscolhido(),
+  );
+  const modeloAtivo = seletor.habilitado
+    ? modeloEscolhido && seletor.modelos.includes(modeloEscolhido)
+      ? modeloEscolhido
+      : seletor.padrao
+    : undefined;
+
   // A ficha do veículo vai como body por requisição. Antes estava em useChat({ body }),
   // que o AI SDK v6 ignora — o perfil do carro nunca chegava ao modelo.
-  const requestOptions = { body: { vehicle: activeVehicle, events: vehicleEvents } };
+  const requestOptions = {
+    body: { vehicle: activeVehicle, events: vehicleEvents, modelo: modeloAtivo },
+  };
 
   // Persist messages for this thread whenever they change.
   useEffect(() => {
@@ -516,7 +548,10 @@ export function ChatWindow({
                     }
                   >
                     {message.role === "assistant" ? (
-                      <MessageResponse>{text}</MessageResponse>
+                      <>
+                        <MessageResponse>{text}</MessageResponse>
+                        <SeloMedicao metadata={message.metadata} />
+                      </>
                     ) : (
                       <>
                         <MessageFiles files={files} />
@@ -557,6 +592,18 @@ export function ChatWindow({
               <PromptInputTools>
                 <AttachFileButton disabled={isLoading} />
                 <AudioRecorderButton disabled={isLoading} />
+                {seletor.habilitado && modeloAtivo && (
+                  <SeletorModelo
+                    modelos={seletor.modelos}
+                    padrao={seletor.padrao}
+                    valor={modeloAtivo}
+                    onChange={(modelo) => {
+                      setModeloEscolhido(modelo);
+                      salvarModeloEscolhido(modelo);
+                    }}
+                    disabled={isLoading}
+                  />
+                )}
               </PromptInputTools>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <ImageIcon className="size-3.5" />

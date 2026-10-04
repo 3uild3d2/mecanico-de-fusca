@@ -326,3 +326,58 @@ export function useThreadsError(): Error | null {
   const query = useQuery({ queryKey: THREADS_QUERY_KEY, queryFn: fetchThreads });
   return query.error instanceof Error ? query.error : null;
 }
+
+// ---------------------------------------------------------------------------
+// Seletor de modelos (benchmark, temporário)
+// ---------------------------------------------------------------------------
+
+const MODELOS_QUERY_KEY = ["modelos"] as const;
+const CHAVE_MODELO_ESCOLHIDO = "mecanico.modelo";
+
+const respostaModelosSchema = z.object({
+  habilitado: z.boolean(),
+  padrao: z.string().optional(),
+  modelos: z.array(z.string()).optional(),
+});
+
+export type SeletorModelos =
+  | { habilitado: false }
+  | { habilitado: true; padrao: string; modelos: string[] };
+
+async function fetchSeletorModelos(): Promise<SeletorModelos> {
+  const resposta = await fetch("/api/modelos");
+  if (!resposta.ok) return { habilitado: false };
+
+  const lido = respostaModelosSchema.safeParse(await resposta.json());
+  if (!lido.success || !lido.data.habilitado || !lido.data.padrao || !lido.data.modelos) {
+    return { habilitado: false };
+  }
+  return { habilitado: true, padrao: lido.data.padrao, modelos: lido.data.modelos };
+}
+
+/** O servidor diz se o seletor existe. Desligado em produção. */
+export function useSeletorModelos(): SeletorModelos {
+  return (
+    useQuery({
+      queryKey: MODELOS_QUERY_KEY,
+      queryFn: fetchSeletorModelos,
+      staleTime: 10 * 60 * 1000,
+    }).data ?? { habilitado: false }
+  );
+}
+
+export function lerModeloEscolhido(): string | null {
+  try {
+    return window.localStorage.getItem(CHAVE_MODELO_ESCOLHIDO);
+  } catch {
+    return null;
+  }
+}
+
+export function salvarModeloEscolhido(modelo: string) {
+  try {
+    window.localStorage.setItem(CHAVE_MODELO_ESCOLHIDO, modelo);
+  } catch {
+    // Sem armazenamento (aba privada): a escolha vale só até recarregar.
+  }
+}

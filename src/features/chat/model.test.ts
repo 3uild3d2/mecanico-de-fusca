@@ -5,8 +5,10 @@ import {
   JANELA_HISTORICO_MENSAGENS,
   NEW_THREAD_TITLE,
   deriveTitle,
+  formatarMedicao,
   getMessageText,
   knownTopicTitle,
+  lerMedicao,
   nextThreadTitle,
   normalizeManualTitle,
   recorteParaEnvio,
@@ -208,5 +210,35 @@ describe("recorteParaEnvio", () => {
     expect(recorte).toHaveLength(JANELA_HISTORICO_MENSAGENS);
     expect(recorte.at(-1)?.id).toBe("m249");
     expect(recorte[0]?.id).toBe(`m${250 - JANELA_HISTORICO_MENSAGENS}`);
+  });
+});
+
+describe("lerMedicao / formatarMedicao", () => {
+  it("formata modelo, tempo e tokens para o selo da resposta", () => {
+    const medicao = lerMedicao({
+      modelo: "openai:gpt-x-mini",
+      duracaoMs: 3240,
+      tokensEntrada: 1234,
+      tokensSaida: 456,
+    });
+    expect(medicao).not.toBeNull();
+    expect(formatarMedicao(medicao!)).toBe("gpt-x-mini · 3,2 s · 1.234 → 456 tokens");
+  });
+
+  it("mostra tokens de raciocínio quando o modelo informa", () => {
+    const medicao = lerMedicao({
+      modelo: "openai:o9",
+      duracaoMs: 12000,
+      tokensEntrada: 2000,
+      tokensSaida: 900,
+      tokensRaciocinio: 640,
+    });
+    expect(formatarMedicao(medicao!)).toBe("o9 · 12,0 s · 2.000 → 900 tokens (640 de raciocínio)");
+  });
+
+  it("devolve null para metadado ausente ou fora do formato — nada de cast", () => {
+    expect(lerMedicao(undefined)).toBeNull();
+    expect(lerMedicao({ modelo: 42 })).toBeNull();
+    expect(lerMedicao({ modelo: "google:gemini" })).toBeNull();
   });
 });

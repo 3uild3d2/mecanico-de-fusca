@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import { z } from "zod";
 
 // Lógica pura do domínio "conversa": tipos, derivação de título e saneamento de
 // mensagens. Sem I/O — é o que os testes cobrem. Acesso a dados fica em api.ts.
@@ -227,4 +228,42 @@ export function sanitizeThread(thread: Thread) {
     updatedAt: thread.updatedAt,
     messages: sanitizeMessages(thread.messages),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Medição por resposta (benchmark de modelos)
+// ---------------------------------------------------------------------------
+
+/**
+ * Metadado que o servidor anexa a cada resposta quando o seletor de modelos
+ * está ligado. Chega pela rede, então passa por zod antes de ser exibido.
+ */
+const medicaoSchema = z.object({
+  modelo: z.string(),
+  duracaoMs: z.number(),
+  tokensEntrada: z.number(),
+  tokensSaida: z.number(),
+  tokensRaciocinio: z.number().optional(),
+});
+
+export type Medicao = z.infer<typeof medicaoSchema>;
+
+export function lerMedicao(metadata: unknown): Medicao | null {
+  const lido = medicaoSchema.safeParse(metadata);
+  return lido.success ? lido.data : null;
+}
+
+const NUMERO = new Intl.NumberFormat("pt-BR");
+const SEGUNDOS = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+/** "gpt-x-mini · 3,2 s · 1.234 → 456 tokens" */
+export function formatarMedicao(m: Medicao): string {
+  const nome = m.modelo.slice(m.modelo.indexOf(":") + 1);
+  const raciocinio = m.tokensRaciocinio
+    ? ` (${NUMERO.format(m.tokensRaciocinio)} de raciocínio)`
+    : "";
+  return `${nome} · ${SEGUNDOS.format(m.duracaoMs / 1000)} s · ${NUMERO.format(m.tokensEntrada)} → ${NUMERO.format(m.tokensSaida)} tokens${raciocinio}`;
 }

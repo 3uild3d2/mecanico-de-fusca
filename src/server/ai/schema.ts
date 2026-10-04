@@ -83,6 +83,8 @@ export const chatRequestSchema = z.object({
   messages: z.array(uiMessageSchema).min(1).max(MAX_MESSAGES_PER_REQUEST),
   vehicle: vehicleSchema,
   events: z.array(vehicleEventSchema).max(MAX_EVENTS_PER_REQUEST).optional(),
+  /** Sugestão do cliente. Quem decide é resolverModelo, no servidor. */
+  modelo: z.string().max(100).optional(),
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;

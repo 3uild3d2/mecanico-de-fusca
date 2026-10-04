@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
+import { Route as ApiModelosRouteImport } from './routes/api/modelos'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiAccountRouteImport } from './routes/api/account'
 import { Route as ApiAuthProfileRouteImport } from './routes/api/auth/profile'
@@ -37,6 +38,11 @@ const CThreadIdRoute = CThreadIdRouteImport.update({
   path: '/c/$threadId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelosRoute = ApiModelosRouteImport.update({
+  id: '/api/modelos',
+  path: '/api/modelos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/modelos': typeof ApiModelosRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/modelos': typeof ApiModelosRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/modelos': typeof ApiModelosRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/account'
     | '/api/chat'
+    | '/api/modelos'
     | '/c/$threadId'
     | '/api/auth/profile'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/account'
     | '/api/chat'
+    | '/api/modelos'
     | '/c/$threadId'
     | '/api/auth/profile'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/account'
     | '/api/chat'
+    | '/api/modelos'
     | '/c/$threadId'
     | '/api/auth/profile'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiAccountRoute: typeof ApiAccountRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiModelosRoute: typeof ApiModelosRoute
   CThreadIdRoute: typeof CThreadIdRoute
   ApiAuthProfileRoute: typeof ApiAuthProfileRoute
 }
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CThreadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/modelos': {
+      id: '/api/modelos'
+      path: '/api/modelos'
+      fullPath: '/api/modelos'
+      preLoaderRoute: typeof ApiModelosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiAccountRoute: ApiAccountRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiModelosRoute: ApiModelosRoute,
   CThreadIdRoute: CThreadIdRoute,
   ApiAuthProfileRoute: ApiAuthProfileRoute,
 }
