@@ -8,7 +8,8 @@ describe("parseModeloId", () => {
       fornecedor: "openai",
       modelo: "gpt-x-mini",
     });
-    expect(parseModeloId(MODELO_PADRAO)?.fornecedor).toBe("google");
+    expect(parseModeloId("google:gemini-x")?.fornecedor).toBe("google");
+    expect(parseModeloId(MODELO_PADRAO)).not.toBeNull();
   });
 
   it("recusa fornecedor desconhecido, modelo vazio ou caractere estranho", () => {
@@ -61,6 +62,21 @@ describe("filtrarModelosDeChat", () => {
       "o9-pro",
     ];
     expect(filtrarModelosDeChat(ids)).toEqual(["gpt-4.1", "gpt-4o", "gpt-x"]);
+  });
+
+  // Conta real em 2026-10-04: o projeto só tinha acesso ao snapshot datado do
+  // gpt-4o, sem o alias. Escondê-lo deixava o modelo inacessível no seletor.
+  it("mantém o snapshot datado quando o alias não está disponível", () => {
+    expect(filtrarModelosDeChat(["gpt-x-2026-05-13", "gpt-x-mini"])).toEqual([
+      "gpt-x-2026-05-13",
+      "gpt-x-mini",
+    ]);
+  });
+
+  it("entre vários snapshots sem alias, fica só o mais recente", () => {
+    expect(filtrarModelosDeChat(["gpt-x-2025-01-01", "gpt-x-2026-05-13"])).toEqual([
+      "gpt-x-2026-05-13",
+    ]);
   });
 
   it("remove duplicados e ordena", () => {

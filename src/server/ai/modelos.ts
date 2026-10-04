@@ -5,8 +5,12 @@
 export const FORNECEDORES = ["google", "openai"] as const;
 export type Fornecedor = (typeof FORNECEDORES)[number];
 
-/** O modelo de produção. É o que todo mundo usa quando o seletor está desligado. */
-export const MODELO_PADRAO = "google:gemini-3-flash-preview";
+/**
+ * O modelo de produção. É o que todo mundo usa quando o seletor está desligado.
+ * PROVISÓRIO desde 2026-10-04: o Gemini saiu (acesso bloqueado, o dono não vai
+ * renovar) e este é o único GPT liberado e testado até o benchmark escolher.
+ */
+export const MODELO_PADRAO = "openai:gpt-4o-mini";
 
 const NOME_DE_MODELO = /^[a-z0-9][a-z0-9.-]*$/i;
 
@@ -27,8 +31,9 @@ export function parseModeloId(id: string): { fornecedor: Fornecedor; modelo: str
 }
 
 // A lista de /v1/models da OpenAI mistura tudo: áudio, imagem, embedding,
-// moderação e snapshots datados de cada modelo. Para um seletor de chat só
-// interessam os nomes de conversa sem data — o snapshot é o mesmo modelo.
+// moderação e snapshots datados de cada modelo. Para um seletor de chat basta
+// um nome por modelo: o alias quando existe; quando o projeto só tem acesso ao
+// snapshot datado (acontece com lista de modelos permitidos), o mais recente.
 //
 // Também ficam de fora, por decisão de produto:
 // - legados (gpt-3.5, gpt-4 puro e -turbo): não são candidatos a produção;
@@ -44,14 +49,16 @@ const LEGADO = /^(gpt-3\.5|gpt-4$|gpt-4-)/;
 const SNAPSHOT_DATADO = /-(\d{4}-\d{2}-\d{2}|\d{4})$/;
 
 export function filtrarModelosDeChat(ids: string[]): string[] {
-  const filtrados = ids.filter(
-    (id) =>
-      PREFIXO_DE_CHAT.test(id) &&
-      !NAO_E_CHAT.test(id) &&
-      !LEGADO.test(id) &&
-      !SNAPSHOT_DATADO.test(id),
-  );
-  return [...new Set(filtrados)].sort();
+  const porModelo = new Map<string, string[]>();
+  for (const id of new Set(ids)) {
+    const base = id.replace(SNAPSHOT_DATADO, "");
+    if (!PREFIXO_DE_CHAT.test(base) || NAO_E_CHAT.test(base) || LEGADO.test(base)) continue;
+    porModelo.set(base, [...(porModelo.get(base) ?? []), id]);
+  }
+
+  return [...porModelo.entries()]
+    .map(([base, versoes]) => (versoes.includes(base) ? base : versoes.sort().at(-1)!))
+    .sort();
 }
 
 /**
