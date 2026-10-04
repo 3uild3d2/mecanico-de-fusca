@@ -688,7 +688,7 @@
      nova, a estrutura e os textos daqui passam a valer, mas as marcações do
      usuário são preservadas por id — e as tarefas que ele criou continuam lá.
      É isso que permite os dois lados manterem a mesma lista. */
-  const VERSAO = 7;
+  const VERSAO = 8;
 
   const BASE = [
     {
@@ -724,28 +724,28 @@
         },
         {
           t: "Auth anônimo e Google no Supabase",
-          n: "Providers ligados e código escrito (supabase-auth.ts, com linkIdentity preservando o histórico). Falta trocar os componentes e testar o login de ponta a ponta. No Android, o atrito conhecido é signInWithIdToken com o plugin nativo.",
+          n: "Componentes já usam Supabase e linkIdentity preserva histórico anônimo. Falta o dono clicar e validar Google de ponta a ponta. No Android, o atrito conhecido é signInWithIdToken com o plugin nativo.",
           s: "fazendo",
         },
         {
           t: "Migrar threads, vehicles, events e auth",
-          n: "Trocar os três stores manuais de useSyncExternalStore por TanStack Query, que já é dependência e está sem uso.",
-          s: "pendente",
+          n: "Feito em 26/07/2026: APIs migradas para Supabase com TanStack Query; Firebase saiu do caminho do app.",
+          s: "feito",
         },
         {
           t: "messages como tabela, uma linha por mensagem",
-          n: "Resolve a reescrita do documento inteiro a cada 600ms durante o streaming.",
-          s: "pendente",
+          n: "Feito em 26/07/2026 com upsert pelo id do AI SDK; resolve a reescrita do documento inteiro durante o streaming.",
+          s: "feito",
         },
         {
           t: "Storage e política de retenção dos anexos",
-          n: "Bucket 'anexos' criado na migration 7 (leitura pública, escrita só na pasta do dono). Falta a rotina que apaga os expirados: o Supabase não tem lifecycle rule como o Firebase — precisa de pg_cron ou job externo lendo attachments.expira_em.",
-          s: "pendente",
+          n: "Upload já vai para o bucket 'anexos' no caminho uid/threadId/arquivo. Falta a rotina que apaga expirados: o Supabase não tem lifecycle rule — precisa de pg_cron ou job externo lendo attachments.expira_em.",
+          s: "fazendo",
         },
         {
           t: "Exclusão de conta, in-app e por URL pública",
-          n: "Requisito do Google Play. Precisa limpar Postgres e Storage numa operação só.",
-          s: "travado",
+          n: "Feito no código em 26/07/2026: botão no app, rota /excluir-conta e endpoint que limpa Storage antes de apagar auth.users. Falta teste real com conta de teste.",
+          s: "feito",
         },
       ],
     },
@@ -877,8 +877,8 @@
       tarefas: [
         {
           t: "Aplicar as regras do Firestore no projeto",
-          n: "firebase deploy --only firestore:rules,storage. Até lá a correção do isAdmin está só no cliente e o Firestore aceita a escrita.",
-          s: "travado",
+          n: "Não é mais necessário: Firebase saiu do código e da dependência em 26/07/2026.",
+          s: "feito",
         },
         {
           t: "Eval do raciocínio com ~20 casos",
@@ -897,8 +897,8 @@
         },
         {
           t: "Projeto Firebase dedicado",
-          n: "Hoje é suporte-24h, nome herdado de outra finalidade. Renomear depois, com usuários dentro, custa migração.",
-          s: "pendente",
+          n: "Não é mais necessário: o app foi migrado para Supabase e a dependência Firebase foi removida.",
+          s: "feito",
         },
         {
           t: "Garantir a chamada de atualizarHipoteses",
@@ -940,8 +940,8 @@
         },
         {
           t: "Página pública de exclusão de conta",
-          n: "Acessível sem instalar o app. Anda junto com a tarefa de exclusão na Fase 2.",
-          s: "pendente",
+          n: "Criada em /excluir-conta em 26/07/2026. Falta validar em produção antes de enviar para a Play Store.",
+          s: "feito",
         },
         {
           t: "Ficha da loja: textos e capturas",

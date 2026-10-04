@@ -8,28 +8,28 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 
 ## Onde o trabalho está
 
-**Fase atual: FASE 2 (migração para Supabase), NO MEIO.** O app ainda roda 100% em Firebase; a fundação do Supabase está pronta e verificada, mas a troca da camada de dados **não começou**. Quem assumir daqui continua exatamente deste ponto.
+**Fase atual: FASE 2 (migração para Supabase), quase fechada no código.** A camada de dados, autenticação, anexos e exclusão de conta já foram trocados para Supabase; Firebase saiu do código e da dependência. Falta validação manual do login Google real e da exclusão de conta em ambiente do dono.
 
 ### O que já está feito na Fase 2 (2026-07-26)
 
-- **Migrations 1–5 escritas e APLICADAS no banco real** (`supabase/migrations/`, aplicadas via `supabase/aplicar-tudo.sql` no SQL Editor). 10 tabelas, RLS em todas.
+- **Migrations 1–7 escritas e APLICADAS no banco real** (`supabase/migrations/`, aplicadas via SQL Editor). 10 tabelas, bucket `anexos`, RLS em todas.
 - **RLS verificada com testes reais** (dois usuários anônimos criados via API): isolamento entre usuários confirmado, escrita de `is_admin` negada (grant de coluna), escrita em `subscriptions` negada (sem política = negado por padrão), trigger de criação de perfil funcionando.
 - **Providers ligados no dashboard:** Anonymous e Google (verificado via `/auth/v1/settings`). Região confirmada: São Paulo.
-- **Código escrito:** `shared/lib/supabase.ts` (cliente), `shared/lib/database.types.ts` (tipos, à mão), `features/auth/supabase-auth.ts` (anônimo + Google via `linkIdentity`, preservando histórico ao logar). Env validada com as chaves novas (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` — as três já estão no `.env` do dono).
+- **Código migrado para Supabase:** `features/chat/api.ts`, `features/garage/api.ts`, `features/garage/events-api.ts`, `features/auth/api.ts`, `features/auth/entitlements.ts` e `features/chat/attachments.ts`. Env usa só Supabase no cliente; `SUPABASE_SECRET_KEY` fica no servidor.
 
 ### O que falta na Fase 2, em ordem
 
 ~~1. Aplicar migrations 6 e 7~~ — **feito em 2026-07-26.** Todas as 7 migrations estão aplicadas; o bucket `anexos` existe. (A primeira versão da 6 falhou com `42804` — a FK de `attachments.message_id` impedia mudar o tipo de um lado só; corrigida para arrastar os dois.)
 
-2. **Trocar a camada de dados:** reescrever `features/chat/api.ts`, `features/garage/api.ts` e `features/garage/events-api.ts` sobre Supabase usando **TanStack Query** (já é dependência, sem uso). Upload de anexos vai para o bucket `anexos` (caminho `uid/threadId/...` — a política exige o uid como primeira pasta). Componentes trocam os imports; `entitlements.ts` passa a ler a linha de `profiles`.
-3. **Trocar o login nos componentes** para `supabase-auth.ts` e **testar Google de ponta a ponta** (exige clique do dono — nunca foi testado, só o provider foi confirmado ligado).
-4. **Aposentar o Firebase:** remover arquivos e dependência só depois do passo 3 validado.
-5. Exclusão de conta (função `apagar_conta` já existe na migration 5; falta endpoint + UI + limpeza do bucket antes do delete).
+~~2. Trocar a camada de dados~~ — **feito em 2026-07-26.** TanStack Query substituiu as stores manuais; `messages` agora é tabela com `upsert` por id do AI SDK.
+~~3. Trocar o login nos componentes~~ — **feito em 2026-07-26.** Falta **testar Google de ponta a ponta** com clique real do dono; esse é o maior risco restante.
+~~4. Aposentar o Firebase no código~~ — **feito em 2026-07-26.** Arquivo `shared/lib/firebase.ts`, envs do cliente e dependência `firebase` foram removidos.
+~~5. Exclusão de conta~~ — **feito no código em 2026-07-26.** Endpoint `/api/account`, botão dentro do app e página pública `/excluir-conta`; falta teste real apagando uma conta de teste.
 
 ### Fatos do ambiente
 
 - **Supabase:** projeto `ougesilqshtsgpnfmdaw`, região São Paulo, chaves novas (`sb_publishable_` / `sb_secret_`), **não** as legadas. Dashboard: `https://supabase.com/dashboard/project/ougesilqshtsgpnfmdaw`.
-- **Firebase (legado, ainda em uso):** projeto `suporte-24h`. As `firestore.rules` do repositório **nunca foram aplicadas** ao projeto — irrelevante se a migração concluir, mas se algo atrasar, aplicar.
+- **Firebase (legado):** saiu do código e da dependência em 2026-07-26. O projeto `suporte-24h` pode continuar existindo no dashboard, mas o app não deve mais depender dele.
 - **Só existe o perfil do dono para migrar** — decisão dele: sem script de migração de dados, começar limpo no Supabase.
 - **Lixo de teste no banco:** 3+ usuários anônimos e uma thread "Fusca esquentando", criados pelos testes de RLS. Limpar quando conveniente (Dashboard → Authentication → Users).
 - **Branch:** `reestruturacao-fase-1`, com remote em `github.com/3uild3d2/mecanico-de-fusca`. O bloco da fundação Supabase foi commitado e enviado em 2026-07-26.
@@ -48,6 +48,8 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 
 - **Login Google no Supabase nunca foi testado de ponta a ponta.** Provider ligado, credencial colada, redirect URI configurada — mas ninguém clicou no botão ainda. O fluxo `linkIdentity` (anônimo → Google preservando histórico) é o ponto com maior chance de surpresa.
 
+- **Exclusão de conta não foi testada em conta real.** O endpoint valida o token, remove objetos do bucket `anexos` e chama `apagar_conta`; falta confirmar no Supabase que uma conta de teste some de Auth, Postgres e Storage.
+
 - **Sem eval do raciocínio.** Mexer em prompt de diagnóstico sem medição é palpite, e regressão em raciocínio é invisível até um usuário reclamar. Falta um conjunto de ~20 casos com desfecho conhecido, rodado a cada mudança, medindo: chegou à conclusão certa? em quantos turnos? descartou hipótese por evidência ou por preferência? Os casos podem sair do próprio acervo do RAG.
 
 - **Nenhuma UI para o histórico.** O agente registra e o histórico vira contexto, mas o dono não tem tela para ver, editar ou apagar os eventos. `removerEvento` já existe em `events-api.ts` e não está ligada a nada. Antes de qualquer usuário real, isso precisa existir — registro automático sem forma de corrigir é armadilha.
@@ -58,13 +60,7 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 
 - **Painel sem estado de carregamento.** Enquanto o modelo pensa, o painel mostra o estado anterior sem indicar que está desatualizado. Numa reordenação grande de pesos isso confunde.
 
-- **Exclusão de conta não existe na interface.** Requisito de publicação na Play Store (in-app + URL pública). Bloqueia o lançamento. A função `apagar_conta` já existe no banco (migration 5, só executável pelo servidor) — falta o endpoint, a UI e a limpeza do bucket `anexos` antes do delete (o cascade do Postgres não apaga objetos do Storage).
-
 - **`is_admin` de ninguém está ligado.** O campo agora vive em `profiles.is_admin`, que só o servidor escreve. Como ainda não existe servidor escrevendo, o selo de admin não aparece para ninguém. Para ativar manualmente: SQL Editor → `update profiles set is_admin = true where email = '...'`. A solução definitiva vem com o billing, na Fase 5.
-
-- **Persistência da thread reescreve tudo.** `saveThreadMessages` grava o documento inteiro (todas as mensagens) a cada 600 ms durante o streaming. Ineficiente e caro em escritas. Some na Fase 2, quando `messages` virar tabela com uma linha por mensagem.
-
-- **Store manual em vez de TanStack Query.** `features/*/api.ts` usa `useSyncExternalStore` escrito à mão. `@tanstack/react-query` já é dependência e está sem uso. A troca acontece na Fase 2, junto com a mudança de backend — fazer antes seria reescrever duas vezes.
 
 - **Sem observabilidade.** Só `console.error`. Com usuário pagante, erro que ninguém vê não existe. Escolher e plugar (Sentry ou equivalente) antes do lançamento.
 
@@ -75,6 +71,39 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-08-13 — Supressão de warnings de hidratação e diagnóstico de Supabase inativo
+
+- **Hidratação:** Adicionado `suppressHydrationWarning` nas tags `<html>` e `<body>` em `src/routes/__root.tsx`. Evita que atributos injetados por extensões de navegador (ex.: `data-bry-content-script-syngular="1"`) gerem avisos no console durante a hidratação do React.
+- **Supabase (`ERR_NAME_NOT_RESOLVED`):** Diagnosticada falha DNS ao tentar renovar token em `ougesilqshtsgpnfmdaw.supabase.co`. No plano gratuito do Supabase, projetos inativos são automaticamente pausados e o DNS é removido até que o projeto seja reativado no Dashboard do Supabase.
+
+### 2026-07-26 — Garagem com múltiplos veículos
+
+A tabela `vehicles` já nasceu plural, mas a UI ainda tratava a garagem como uma ficha única. A ficha agora tem abas tipo ficheiro: `Novo Fusca` é uma ficha em branco que não grava nada até salvar, e cada veículo cadastrado aparece ao lado pelo nome derivado de apelido/modelo/ano.
+
+Selecionar uma aba existente também marca aquele veículo como `ativo`, porque é essa ficha que entra no contexto do chat. A decisão evita um seletor separado e mantém explícito qual carro o agente está usando. A regra do nome da aba ficou em `features/garage/model.ts` para ser testada junto com a lógica pura.
+
+### 2026-07-26 — Perfil Supabase sincronizado pelo servidor
+
+Depois do primeiro login Google funcionar, `profiles` ainda podia ficar vazio. Isso bloqueia gravações em `threads`, `vehicles` e `vehicle_events`, porque todas têm FK para `profiles`. O app dependia só do trigger `handle_new_user`; isso é correto no banco, mas frágil para diagnosticar quando o trigger não preencheu ou quando o vínculo Google altera os metadados depois da criação anônima.
+
+Foi criado `/api/auth/profile`: o cliente envia o token da sessão, o servidor valida com Supabase Admin e faz `upsert` em `profiles` com `id`, `display_name` e `email`. O cliente chama isso ao garantir sessão e em mudança de auth. Mantém a regra: entitlements continuam server-authoritative; o cliente não escreve `is_admin` nem `plan`.
+
+### 2026-07-26 — Fallback do Google quando `linkIdentity` falha
+
+O primeiro teste manual do login Google falhou antes de abrir o OAuth. A causa provável é que `supabase.auth.linkIdentity` exige a opção de vínculo manual habilitada no Supabase; se ela estiver desligada, o SDK devolve erro e o app bloqueava o login.
+
+O fluxo agora tenta preservar o histórico anônimo com `linkIdentity`, mas, se isso falhar, cai para `signInWithOAuth` normal. Decisão consciente: é melhor permitir login Google mesmo que uma conversa anônima fique para trás do que impedir o usuário de entrar. O erro real também passou a aparecer no toast e no console, em vez da mensagem genérica.
+
+### 2026-07-26 — Código migra de Firebase para Supabase
+
+A troca foi feita de uma vez porque manter duas camadas de dados ativas criaria mais estados intermediários do que segurança: chat, garagem, histórico, entitlements, auth, anexos e exclusão de conta agora usam Supabase. Firebase foi removido da dependência para o bundle não carregar código morto.
+
+`messages` virou persistência por linha com `upsert` pelo id do AI SDK. Isso resolve a dívida de reescrever a thread inteira durante o streaming e torna reconexão idempotente. O cache do cliente fica em TanStack Query; funções imperativas (`createThread`, `saveThreadMessages`) atualizam o mesmo `QueryClient` compartilhado para preservar a interface dos componentes.
+
+Exclusão de conta ficou server-authoritative: o cliente envia o token da sessão, `/api/account` valida com Supabase Admin, limpa `storage.objects` no bucket `anexos` e só depois chama `apagar_conta`. Alternativa descartada: apagar pelo cliente, porque cascata do Postgres não remove objetos do Storage e o cliente não deve ter poder administrativo.
+
+Validação local: `npm run check` passou (113 testes) e `npm run build` passou. O que não foi validado por ferramenta: OAuth Google real e exclusão de uma conta real no dashboard.
 
 ### 2026-07-26 — Fundação Supabase aplicada e verificada
 
@@ -87,7 +116,7 @@ As migrations 1–5 rodaram no banco real e a segurança foi testada de verdade,
 - `messages.id` vira **text** (migration 6): o id é gerado pelo AI SDK no navegador (`msg-...`), não uuid. Guardar o id do SDK permite gravar por upsert — idempotente mesmo com reconexão. Alternativa descartada: coluna extra só para o id do cliente (uma chave a mais para sincronizar, sem ganho).
 - Bucket `anexos` com **leitura pública** (migration 7): paridade com o Firebase — a URL fica dentro da mensagem e `/api/chat` a baixa sem sessão; o nome do objeto carrega uuid, então não é adivinhável. Alternativa (signed URLs) daria expiração de verdade, mas complicaria o servidor; reavaliar se o produto mudar de postura. Escrita: só o dono, só na pasta `uid/...`.
 
-Essas duas ainda **não foram aplicadas** — estão em `supabase/aplicar-pendentes.sql`, aguardando o dono.
+Essas duas foram aplicadas em 2026-07-26; o topo deste arquivo é a fonte do estado atual.
 
 ### 2026-07-26 — Como trabalhar com o dono do projeto
 

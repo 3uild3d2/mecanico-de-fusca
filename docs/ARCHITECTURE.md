@@ -87,7 +87,7 @@ foi resolvido fica em `docs/CONTEXTO.md`.
 | ---- | --------------------------------------- | ---------------------- |
 | 3.1  | Anexos reenviados a cada mensagem       | ✅ resolvido           |
 | 3.2  | `isAdmin` escrito pelo cliente          | ✅ resolvido           |
-| 3.3  | Exclusão de conta não existe            | ⛔ bloqueia lançamento |
+| 3.3  | Exclusão de conta não existe            | 🔄 validar             |
 | 3.4  | Histórico inteiro em toda requisição    | ✅ resolvido           |
 | 3.5  | Zero validação de entrada               | ✅ resolvido           |
 | 3.6  | Zero testes                             | ✅ resolvido           |
@@ -112,7 +112,7 @@ O navegador escrevia `isAdmin` no próprio documento do usuário — o cliente d
 
 A política do Google Play exige que apps com criação de conta ofereçam exclusão **dentro do app** e por **uma URL pública**, apagando também os dados. Não existe nada disso. Sem isso o app não passa na revisão. (Confirmar o texto vigente da política antes do envio.)
 
-Planejado para a Fase 2: apagar conta precisa limpar banco e Storage numa operação só.
+Implementado em `/api/account` e `/excluir-conta`: o servidor valida a sessão, limpa o bucket `anexos` e chama `apagar_conta`. Falta validar em conta real antes do envio à Play Store.
 
 ### 3.4 Histórico inteiro enviado em toda requisição ✅
 
@@ -206,13 +206,13 @@ Cada fase deixa o app funcionando. Nada de big bang.
 
 ### Fase 2 — Migração para Supabase 🔄 _(em andamento — estado detalhado em `docs/CONTEXTO.md`)_
 
-- ✅ Migrations com schema + RLS (1–5 **aplicadas** ao banco em 2026-07-26; 6–7 escritas, aguardando aplicação via `supabase/aplicar-pendentes.sql`)
+- ✅ Migrations com schema + RLS (1–7 aplicadas ao banco em 2026-07-26)
 - ✅ RLS verificada com dois usuários reais: isolamento, bloqueio de `is_admin` e de `subscriptions`
-- 🔄 Auth anônimo + Google: providers ligados, `features/auth/supabase-auth.ts` escrito (`linkIdentity` preserva o histórico); falta trocar os componentes e testar o login de ponta a ponta. No Android, `signInWithIdToken` com o plugin nativo — é o ponto de atrito conhecido.
-- ⏳ Reescrever `threads` / `vehicles` / `events` / `auth` sobre o Supabase, usando **TanStack Query** (já é dependência e hoje não é usada; substitui os singletons de `useSyncExternalStore` escritos à mão)
-- ⏳ Upload de anexos para o bucket `anexos` (caminho `uid/threadId/...`); retenção de 48h exige rotina própria — Supabase não tem lifecycle rule (ver pendências)
-- ⏳ Exclusão de conta (seção 3.3; `apagar_conta` já existe no banco)
-- ⏳ Aposentar o Firebase depois do login Google validado
+- 🔄 Auth anônimo + Google: componentes já usam Supabase; falta testar o login Google de ponta a ponta com clique real. No Android, `signInWithIdToken` com o plugin nativo — é o ponto de atrito conhecido.
+- ✅ `threads` / `vehicles` / `events` / `auth` reescritos sobre Supabase com **TanStack Query**
+- 🔄 Upload de anexos para o bucket `anexos` feito; retenção de 48h ainda exige rotina própria — Supabase não tem lifecycle rule (ver pendências)
+- 🔄 Exclusão de conta implementada no código (`/api/account` + `/excluir-conta`); falta teste real apagando uma conta de teste
+- ✅ Firebase aposentado no código e removido da dependência
 - Sem script de migração de dados: só existe o perfil do dono, decisão dele de começar limpo
 
 ### Fase 3 — RAG (pgvector)
