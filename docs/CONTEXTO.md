@@ -13,7 +13,7 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no código** antes de entrar aqui — todos os achados procederam. Ordem acordada:
 
 1. ~~Limites do `/api/chat` aplicados antes do recorte~~ — **feito em 2026-10-04.** Ver Decisões.
-2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI.
+2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI. **Em andamento:** seletor de modelos e medição por resposta prontos (2026-10-04); falta a bateria, o executor e o juiz. Decisões do dono: eu rascunho ~15 casos e ele revisa; nota por modelo juiz automático; Gemini atual entra como referência.
 3. `/api/chat` com sessão obrigatória e limite de uso; downloads de anexo restritos ao Storage do projeto.
 4. Histórico e conversa separados por veículo (migration nova).
 5. Persistência só do que mudou; resumo estruturado do diagnóstico; RAG piloto.
@@ -53,6 +53,10 @@ Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no 
 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
 
+- **Gemini respondendo 403 "Your project has been denied access"** (desde 2026-10-04). Uma chamada passou e, minutos depois, todas as seguintes falharam com `PERMISSION_DENIED` vindo de `generativelanguage.googleapis.com`. É bloqueio na conta Google AI Studio / Google Cloud, não no código. É o modelo de produção: enquanto durar, o chat não responde com o padrão.
+
+- **`OPENAI_API_KEY` vem de uma variável de ambiente do Windows**, não do `.env` do projeto (descoberto em 2026-10-04). Ou seja, o app usaria a conta de outra ferramenta sem ninguém ter escolhido isso. Nenhuma chamada à OpenAI foi feita até o dono decidir qual chave o Mecânico usa. Atenção: se ele puser uma chave no `.env`, confirmar qual das duas prevalece — carregadores de `.env` costumam *não* sobrescrever variável que já existe no ambiente.
+
 - **Histórico do carro misturado entre veículos** (achado em 2026-10-04, etapa 4 do plano). `vehicle_events` grava `vehicle_id`, mas `events-api.ts` carrega por `user_id` só; e `threads` não tem `vehicle_id`, então a conversa usa a ficha do veículo *ativo na garagem*, não a do carro dela. Com Fusca e Brasília cadastrados, a bobina trocada num entra no contexto do outro, e reabrir uma conversa antiga com outro carro selecionado troca a ficha.
 
 - **Servidor baixa qualquer URL recebida** (achado em 2026-10-04, etapa 3). `fetchAsDataUrl` em `server/ai/messages.ts` aceita qualquer `http(s)` vinda no corpo do pedido — e o `/api/chat` não exige sessão. É SSRF: alguém pode fazer o servidor acessar destinos indevidos. Restringir ao domínio do Storage do projeto e não seguir redirecionamentos. (O bucket público é decisão separada, registrada em 2026-07-26.)
@@ -90,6 +94,14 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-10-04 — Seletor de modelos para o benchmark (temporário)
+
+Ligado só por `SELETOR_MODELOS=ligado` no `.env` local; sem isso `/api/modelos` responde `{ habilitado: false }` e o `/api/chat` ignora o modelo pedido. **Descartado:** detectar modo de desenvolvimento (`NODE_ENV`) — depende de como o build é rodado; opt-in explícito não liga por acidente em produção.
+
+A lista vem de `/v1/models` da própria OpenAI, filtrada (`filtrarModelosDeChat`), em vez de um catálogo escrito à mão — assim não oferece modelo que a conta não tem nem depende de eu saber quais existem. Ficam fora por decisão de produto: legados, `-pro` (custo por mensagem incompatível com assinatura), `-chat-latest` (alias que muda sem aviso) e voz em tempo real.
+
+A medição (modelo, duração, tokens) vai em `messageMetadata` só com o seletor ligado e mede **um pedido**: quando o cliente devolve resultado de ferramenta, a continuação é outro pedido e o selo passa a mostrar só ela. Para comparação séria, vale o executor da bateria, não o selo.
 
 ### 2026-10-04 — Limites do `/api/chat`: janela de mensagens no cliente, teto de eventos como defesa
 
