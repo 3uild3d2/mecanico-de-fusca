@@ -13,6 +13,7 @@ import {
   normalizeManualTitle,
   recorteParaEnvio,
   sanitizeMessages,
+  textoComTranscricoes,
 } from "./model";
 
 function userMsg(text: string): UIMessage {
@@ -240,5 +241,29 @@ describe("lerMedicao / formatarMedicao", () => {
     expect(lerMedicao(undefined)).toBeNull();
     expect(lerMedicao({ modelo: 42 })).toBeNull();
     expect(lerMedicao({ modelo: "google:gemini" })).toBeNull();
+  });
+});
+
+describe("textoComTranscricoes", () => {
+  it("junta o texto do dono e a transcrição, deixando claro o que veio do áudio", () => {
+    expect(textoComTranscricoes("Olha isso", ["o motor falha no pisão"])).toBe(
+      'Olha isso\n\n🎙️ Transcrição do áudio: "o motor falha no pisão"',
+    );
+  });
+
+  it("só áudio: a mensagem é a transcrição", () => {
+    expect(textoComTranscricoes("", ["o motor falha"])).toBe(
+      '🎙️ Transcrição do áudio: "o motor falha"',
+    );
+  });
+
+  it("vários áudios são numerados", () => {
+    expect(textoComTranscricoes(undefined, ["um", "dois"])).toBe(
+      '🎙️ Transcrição do áudio 1: "um"\n\n🎙️ Transcrição do áudio 2: "dois"',
+    );
+  });
+
+  it("áudio sem fala vira aviso, não texto vazio", () => {
+    expect(textoComTranscricoes("", ["  "])).toBe("🎙️ Áudio sem fala reconhecível.");
   });
 });

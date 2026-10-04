@@ -33,12 +33,18 @@ import {
   lerModeloEscolhido,
   salvarModeloEscolhido,
   saveThreadMessages,
+  transcreverAudio,
   useSeletorModelos,
   useThread,
 } from "@/features/chat/api";
 import { SeletorModelo } from "@/features/chat/components/SeletorModelo";
 import { extractEstadoDiagnostico, type EstadoDiagnostico } from "@/features/chat/hipoteses";
-import { formatarMedicao, lerMedicao, recorteParaEnvio } from "@/features/chat/model";
+import {
+  formatarMedicao,
+  lerMedicao,
+  recorteParaEnvio,
+  textoComTranscricoes,
+} from "@/features/chat/model";
 import { useActiveVehicle } from "@/features/garage/api";
 import { registrarEvento, useVehicleEvents } from "@/features/garage/events-api";
 import type { VehicleEvent } from "@/features/garage/events";
@@ -95,16 +101,12 @@ function getMessageFiles(message: UIMessage) {
   return message.parts.filter((part): part is FileUIPart => part.type === "file");
 }
 
-function defaultAttachmentPrompt(files: FileUIPart[]) {
-  const hasAudio = files.some((file) => file.mediaType?.startsWith("audio/"));
-  const hasImage = files.some((file) => file.mediaType?.startsWith("image/"));
-
-  if (hasAudio && hasImage) {
-    return "Analise o áudio e as imagens enviados e me ajude com o diagnóstico do Fusca.";
-  }
-  if (hasAudio) {
-    return "Ouça o áudio enviado e me ajude com o diagnóstico do Fusca.";
-  }
+/**
+ * Texto para anexo enviado sem mensagem. Só sobra o caso da imagem: áudio
+ * sempre chega com a transcrição como texto. (Antes havia "Ouça o áudio" —
+ * promessa que um modelo de texto não cumpre.)
+ */
+function defaultAttachmentPrompt(_files: FileUIPart[]) {
   return "Analise a imagem enviada e me ajude com o diagnóstico do Fusca.";
 }
 
@@ -477,8 +479,25 @@ export function ChatWindow({
         }
       }
 
+      // O mecânico não ouve áudio: a fala é transcrita aqui, uma vez, e vai
+      // como texto da própria mensagem (fica salva junto, sem retranscrever).
+      const audios = preparedFiles.filter((file) => file.mediaType?.startsWith("audio/"));
+      let mensagem = text;
+      if (audios.length > 0) {
+        let transcricoes: string[];
+        try {
+          transcricoes = await Promise.all(audios.map((audio) => transcreverAudio(audio.url)));
+        } catch (erroTranscricao) {
+          toast.error(
+            "Não consegui entender o áudio. Tente gravar de novo ou escreva o que está acontecendo.",
+          );
+          throw erroTranscricao;
+        }
+        mensagem = textoComTranscricoes(text, transcricoes);
+      }
+
       sendMessage(
-        { files: preparedFiles, text: text || defaultAttachmentPrompt(preparedFiles) },
+        { files: preparedFiles, text: mensagem || defaultAttachmentPrompt(preparedFiles) },
         requestOptions,
       );
     } catch (error) {

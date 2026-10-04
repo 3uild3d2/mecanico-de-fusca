@@ -381,3 +381,28 @@ export function salvarModeloEscolhido(modelo: string) {
     // Sem armazenamento (aba privada): a escolha vale só até recarregar.
   }
 }
+
+// ---------------------------------------------------------------------------
+// Transcrição de áudio
+// ---------------------------------------------------------------------------
+
+const respostaTranscricaoSchema = z.object({ texto: z.string() });
+const erroSchema = z.object({ error: z.string() });
+
+/** Transcreve um áudio já enviado (URL do Storage ou data URL em ambiente local). */
+export async function transcreverAudio(url: string): Promise<string> {
+  const resposta = await fetch("/api/transcrever", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const corpo: unknown = await resposta.json().catch(() => null);
+
+  if (!resposta.ok) {
+    const erro = erroSchema.safeParse(corpo);
+    throw new Error(erro.success ? erro.data.error : "Não foi possível transcrever o áudio.");
+  }
+  const lido = respostaTranscricaoSchema.safeParse(corpo);
+  if (!lido.success) throw new Error("Resposta inesperada da transcrição.");
+  return lido.data.texto;
+}

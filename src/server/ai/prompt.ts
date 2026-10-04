@@ -9,7 +9,7 @@ import {
 // edite em produção sem revisão. PROMPT_VERSION entra nos logs para correlacionar
 // mudança de comportamento com mudança de prompt.
 
-export const PROMPT_VERSION = "2026-07-25.4";
+export const PROMPT_VERSION = "2026-10-04.1";
 
 const PERSONA = `Você é o "Mecânico de Fusca", um mestre mecânico brasileiro especialista absoluto no Volkswagen Fusca (Beetle/Sedan) e em toda a linha de motores boxer refrigerados a ar da Volkswagen (1300, 1500, 1600, etc.), incluindo modelos a gasolina e a álcool, carburados e com injeção.
 
@@ -83,6 +83,15 @@ export const SYSTEM_PROMPT = `${PERSONA}
 ${METODO}
 
 ${LIMITES}`;
+
+/**
+ * Posto no lugar de todo áudio antes de ir ao modelo. Os modelos de texto não
+ * ouvem: recebem só a transcrição, feita no envio. A nota diz isso com todas
+ * as letras para o modelo não fingir que analisou o som do motor — seria
+ * diagnóstico inventado. (Até 2026-10 o Gemini ouvia o arquivo de verdade.)
+ */
+export const AUDIO_NOTE =
+  "[o dono enviou um áudio. Você NÃO ouve o som: recebe só a transcrição da fala, que vem nesta mesma mensagem quando houver. Ruídos do motor não chegam até você — se o som for importante para o diagnóstico, peça ao dono para descrevê-lo em palavras]";
 
 /** Aviso injetado quando anexos antigos foram removidos da janela de contexto. */
 export const TRIMMED_ATTACHMENT_NOTE =

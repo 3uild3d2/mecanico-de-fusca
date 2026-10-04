@@ -267,3 +267,21 @@ export function formatarMedicao(m: Medicao): string {
     : "";
   return `${nome} · ${SEGUNDOS.format(m.duracaoMs / 1000)} s · ${NUMERO.format(m.tokensEntrada)} → ${NUMERO.format(m.tokensSaida)} tokens${raciocinio}`;
 }
+
+// ---------------------------------------------------------------------------
+// Transcrição de áudio
+// ---------------------------------------------------------------------------
+
+/**
+ * Texto final da mensagem com a fala transcrita. O modelo não ouve o áudio:
+ * é este texto que ele recebe. Fica salvo na mensagem, então o mesmo áudio não
+ * é transcrito de novo a cada resposta — e o dono vê o que o mecânico "ouviu".
+ */
+export function textoComTranscricoes(texto: string | undefined, transcricoes: string[]): string {
+  const blocos = transcricoes.map((t, i) => {
+    const rotulo =
+      transcricoes.length > 1 ? `Transcrição do áudio ${i + 1}` : "Transcrição do áudio";
+    return t.trim() ? `🎙️ ${rotulo}: "${t.trim()}"` : "🎙️ Áudio sem fala reconhecível.";
+  });
+  return [texto?.trim(), ...blocos].filter(Boolean).join("\n\n");
+}

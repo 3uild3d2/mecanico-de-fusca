@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessage } from "ai";
 
-import { TRIMMED_ATTACHMENT_NOTE } from "./prompt";
+import { AUDIO_NOTE, TRIMMED_ATTACHMENT_NOTE } from "./prompt";
 import {
   ATTACHMENT_WINDOW_MESSAGES,
   MAX_HISTORY_MESSAGES,
@@ -202,5 +202,29 @@ describe("prepareModelMessages", () => {
     await prepareModelMessages([...conversation, msg("e agora?")], fetchImpl);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("áudio não vai para o modelo", () => {
+  it("troca o áudio pela nota e não baixa o arquivo — o modelo de texto não ouve", async () => {
+    const fetchSpy = vi.fn();
+    const mensagens: UIMessage[] = [
+      {
+        id: "m1",
+        role: "user",
+        parts: [
+          { type: "file", url: "https://storage/a.webm", mediaType: "audio/webm" },
+          { type: "text", text: "Transcrição do áudio: o motor falha" },
+        ],
+      },
+    ];
+
+    const [m] = await prepareModelMessages(mensagens, fetchSpy);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(m?.parts).toEqual([
+      { type: "text", text: AUDIO_NOTE },
+      { type: "text", text: "Transcrição do áudio: o motor falha" },
+    ]);
   });
 });

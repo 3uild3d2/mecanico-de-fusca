@@ -3,7 +3,7 @@ import type { UIMessage } from "ai";
 
 import { JANELA_HISTORICO_MENSAGENS } from "@/features/chat/model";
 
-import { TRIMMED_ATTACHMENT_NOTE } from "./prompt";
+import { AUDIO_NOTE, TRIMMED_ATTACHMENT_NOTE } from "./prompt";
 
 /**
  * Preparo das mensagens antes de mandar ao modelo.
@@ -190,6 +190,28 @@ async function inlineAttachments(
 }
 
 /**
+ * Troca todo áudio pela nota. O modelo de texto não aceita áudio (a API
+ * recusa e a mensagem inteira falharia) e a fala já chega transcrita no texto
+ * da própria mensagem — baixar o arquivo seria custo sem uso.
+ */
+export function substituirAudioPorNota(messages: UIMessage[]): UIMessage[] {
+  return messages.map((message) => {
+    const temAudio = message.parts.some(
+      (part) => isFilePart(part) && part.mediaType?.startsWith("audio/"),
+    );
+    if (!temAudio) return message;
+    return {
+      ...message,
+      parts: message.parts.map((part) =>
+        isFilePart(part) && part.mediaType?.startsWith("audio/")
+          ? { type: "text" as const, text: AUDIO_NOTE }
+          : part,
+      ),
+    };
+  });
+}
+
+/**
  * Aplica janela de histórico, poda anexos antigos e embute os recentes.
  * A ordem importa: podar antes de embutir evita baixar o que seria descartado.
  */
@@ -197,7 +219,7 @@ export async function prepareModelMessages(
   messages: UIMessage[],
   fetchImpl: FetchLike = fetch,
 ): Promise<UIMessage[]> {
-  const windowed = applyHistoryWindow(messages);
+  const windowed = substituirAudioPorNota(applyHistoryWindow(messages));
   const pruned = stripAttachmentsOutsideWindow(windowed);
   return inlineAttachments(pruned, fetchImpl);
 }

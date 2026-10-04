@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
+import { Route as ApiTranscreverRouteImport } from './routes/api/transcrever'
 import { Route as ApiModelosRouteImport } from './routes/api/modelos'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiAccountRouteImport } from './routes/api/account'
@@ -36,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
 const CThreadIdRoute = CThreadIdRouteImport.update({
   id: '/c/$threadId',
   path: '/c/$threadId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTranscreverRoute = ApiTranscreverRouteImport.update({
+  id: '/api/transcrever',
+  path: '/api/transcrever',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelosRoute = ApiModelosRouteImport.update({
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/api/modelos': typeof ApiModelosRoute
+  '/api/transcrever': typeof ApiTranscreverRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/api/modelos': typeof ApiModelosRoute
+  '/api/transcrever': typeof ApiTranscreverRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/api/account': typeof ApiAccountRoute
   '/api/chat': typeof ApiChatRoute
   '/api/modelos': typeof ApiModelosRoute
+  '/api/transcrever': typeof ApiTranscreverRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/api/auth/profile': typeof ApiAuthProfileRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/api/account'
     | '/api/chat'
     | '/api/modelos'
+    | '/api/transcrever'
     | '/c/$threadId'
     | '/api/auth/profile'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/api/account'
     | '/api/chat'
     | '/api/modelos'
+    | '/api/transcrever'
     | '/c/$threadId'
     | '/api/auth/profile'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/api/account'
     | '/api/chat'
     | '/api/modelos'
+    | '/api/transcrever'
     | '/c/$threadId'
     | '/api/auth/profile'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   ApiAccountRoute: typeof ApiAccountRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiModelosRoute: typeof ApiModelosRoute
+  ApiTranscreverRoute: typeof ApiTranscreverRoute
   CThreadIdRoute: typeof CThreadIdRoute
   ApiAuthProfileRoute: typeof ApiAuthProfileRoute
 }
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/c/$threadId'
       fullPath: '/c/$threadId'
       preLoaderRoute: typeof CThreadIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcrever': {
+      id: '/api/transcrever'
+      path: '/api/transcrever'
+      fullPath: '/api/transcrever'
+      preLoaderRoute: typeof ApiTranscreverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/modelos': {
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAccountRoute: ApiAccountRoute,
   ApiChatRoute: ApiChatRoute,
   ApiModelosRoute: ApiModelosRoute,
+  ApiTranscreverRoute: ApiTranscreverRoute,
   CThreadIdRoute: CThreadIdRoute,
   ApiAuthProfileRoute: ApiAuthProfileRoute,
 }
