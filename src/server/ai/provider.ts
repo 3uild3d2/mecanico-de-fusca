@@ -20,8 +20,10 @@ export function criarModelo(id: string, env: ServerEnv): LanguageModel {
   if (!parsed) throw new Error(`Modelo inválido: ${id}`);
 
   if (parsed.fornecedor === "openai") {
-    if (!env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não está configurada no .env.");
-    return createOpenAI({ apiKey: env.OPENAI_API_KEY })(parsed.modelo);
+    if (!env.MECANICO_OPENAI_API_KEY) {
+      throw new Error("MECANICO_OPENAI_API_KEY não está configurada no .env.");
+    }
+    return createOpenAI({ apiKey: env.MECANICO_OPENAI_API_KEY })(parsed.modelo);
   }
   return createGoogleAiStudioProvider(env.GOOGLE_GENERATIVE_AI_API_KEY)(parsed.modelo);
 }
@@ -59,9 +61,9 @@ async function listarModelosOpenAI(apiKey: string): Promise<string[]> {
  * catálogo escrito à mão — assim não oferece modelo que a conta não tem.
  */
 export async function modelosDisponiveis(env: ServerEnv): Promise<string[]> {
-  if (!env.OPENAI_API_KEY) return [MODELO_PADRAO];
+  if (!env.MECANICO_OPENAI_API_KEY) return [MODELO_PADRAO];
   try {
-    const openai = await listarModelosOpenAI(env.OPENAI_API_KEY);
+    const openai = await listarModelosOpenAI(env.MECANICO_OPENAI_API_KEY);
     return [MODELO_PADRAO, ...openai.map((m) => `openai:${m}`)];
   } catch (error) {
     console.error("[modelos] não foi possível listar os modelos da OpenAI", error);
