@@ -13,7 +13,7 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no código** antes de entrar aqui — todos os achados procederam. Ordem acordada:
 
 1. ~~Limites do `/api/chat` aplicados antes do recorte~~ — **feito em 2026-10-04.** Ver Decisões.
-2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI. **Em andamento:** seletor, medição por resposta, 15 casos rascunhados, executor e juiz prontos e testados (2026-10-04) — `npm run avaliar`. Bloqueado para rodar de verdade: Gemini em 403 e chave própria da OpenAI ainda não configurada. Casos aguardam revisão do dono (`revisado: false`). Decisões do dono: eu rascunho ~15 casos e ele revisa; nota por modelo juiz automático; Gemini atual entra como referência.
+2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI. **Em andamento:** seletor, medição por resposta, 15 casos rascunhados, executor e juiz prontos e testados (2026-10-04) — `npm run avaliar`. Bloqueado para rodar de verdade: Gemini em 403 e chave própria da OpenAI ainda não configurada. Casos aguardam revisão do dono (`revisado: false`). Decisões do dono: eu rascunho ~15 casos e ele revisa; nota por modelo juiz automático; **só modelos GPT** (o Gemini saiu em 2026-10-04 — ver Decisões).
 3. `/api/chat` com sessão obrigatória e limite de uso; downloads de anexo restritos ao Storage do projeto.
 4. Histórico e conversa separados por veículo (migration nova).
 5. Persistência só do que mudou; resumo estruturado do diagnóstico; RAG piloto.
@@ -53,6 +53,14 @@ Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no 
 ## Pendências conhecidas
 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
+
+- **Áudio quebra o chat com modelos GPT** (achado em 2026-10-04). O app grava `audio/webm` e manda como anexo; o Gemini ouvia o arquivo, inclusive o som do motor. Na API Responses da OpenAI, o provedor aceita só imagem e PDF e lança `UnsupportedFunctionalityError` para áudio — a mensagem inteira falha. Pela página de preços, entrada de áudio só existe nos modelos de voz em tempo real. Decisão de produto pendente com o dono.
+
+- **RAG precisa de outro modelo de embedding.** A decisão da Fase 3 era `gemini-embedding-001` a 768 dimensões, já gravada em `chunks.embedding vector(768)`. Com o Gemini fora, os embeddings da OpenAI aceitam reduzir dimensão, então dá para manter 768 sem migration — confirmar o modelo e liberá-lo no projeto da OpenAI antes de gerar o primeiro vetor. O dono está redigindo a documentação do RAG em paralelo (2026-10-04), fora do repositório; quando ela entrar, precisa seguir o formato decidido e a regra 8.
+
+- **Projeto da OpenAI com lista de modelos permitidos.** A chave do Mecânico enxerga só `gpt-4o-2024-11-20`, `gpt-4o-mini` e dois de imagem (2026-10-04). Todo modelo que o benchmark, a transcrição ou o RAG usarem precisa ser liberado nas configurações do projeto.
+
+- **`GOOGLE_GENERATIVE_AI_API_KEY` ainda é obrigatória** em `server/config/env.ts`. Com o Gemini fora, se a chave sair do `.env` o servidor não sobe. Remover o provedor Google por inteiro quando o modelo definitivo for escolhido.
 
 - **Cast sobre saída do modelo em `ChatWindow.tsx`** (achado em 2026-10-04). `onToolCall` faz `toolCall.input as RegistrarEventoInput` — entrada que veio do modelo passando sem validação, contra a regra 3. Trocar por `safeParse` do mesmo schema de `tools.ts`.
 
@@ -95,6 +103,12 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-10-04 — Gemini sai; padrão provisório `gpt-4o-mini`
+
+O Gemini passou a responder 403 ("project has been denied access") e o dono decidiu não renovar: o produto segue só com modelos da OpenAI. `MODELO_PADRAO` virou `openai:gpt-4o-mini` **provisoriamente** — único GPT liberado no projeto e já testado — até o benchmark escolher o definitivo.
+
+Primeira execução real da bateria (caso `bomba-aceleracao`, juiz `gpt-4o`): ferramentas funcionaram, o painel apareceu em todo turno, mas o `gpt-4o-mini` concluiu pela boia em vez da bomba de aceleração (nota 4) e registrou "confirmado" antes do reparo — a checagem objetiva pegou. Custo: ~US$ 0,0015 por mensagem, ~22 mil tokens de entrada por caso de 3 falas. O relatório agora traz custo por mensagem (`avaliacao/precos.ts`, tabela da página oficial consultada nesta data — confira antes de decidir por custo).
 
 ### 2026-10-04 — Bateria de avaliação: roteiro fixo, juiz anônimo, resultados fora do git
 
