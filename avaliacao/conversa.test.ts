@@ -168,7 +168,7 @@ describe("juiz", () => {
   });
 
   it("lê a avaliação estruturada e limita a nota entre 0 e 10", async () => {
-    const avaliacao = {
+    const resposta = {
       causa: "acertou",
       criterios: [{ criterio: "k", cumpriu: true, evidencia: "Teste a bomba." }],
       violacoes: [],
@@ -177,11 +177,12 @@ describe("juiz", () => {
       nota: 14,
       justificativa: "Bom método.",
     };
-    const juiz = new MockLanguageModelV3({ doGenerate: texto(JSON.stringify(avaliacao)) });
+    const juiz = new MockLanguageModelV3({ doGenerate: texto(JSON.stringify(resposta)) });
 
-    const resultado = await julgar(CASO, turnos, juiz);
+    const { avaliacao, tokensEntrada } = await julgar(CASO, turnos, juiz);
 
-    expect(resultado.causa).toBe("acertou");
-    expect(resultado.nota).toBe(10);
+    expect(avaliacao.causa).toBe("acertou");
+    expect(avaliacao.nota).toBe(10);
+    expect(tokensEntrada).toBe(100);
   });
 });

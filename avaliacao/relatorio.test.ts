@@ -49,6 +49,7 @@ function gerar() {
     juiz: "openai:juiz-x",
     resultados,
     placar: calcularPlacar(resultados, { apenasRevisados: false }),
+    mensagensPorMes: 120,
   });
 }
 
@@ -66,6 +67,13 @@ describe("gerarRelatorioHtml", () => {
     expect(html).toContain("juiz-x");
     expect(html).toContain("Painel de hipóteses ausente");
     expect(html).toContain("juiz caiu");
+  });
+
+  it("põe o custo no centro: seção custo × qualidade com a premissa explícita", () => {
+    const html = gerar();
+    expect(html).toContain("Custo × qualidade");
+    expect(html).toContain("120 mensagens por mês");
+    expect(html).toContain("Este estudo custou");
   });
 
   it("marca o caso ainda não revisado e mostra a dúvida para o dono", () => {

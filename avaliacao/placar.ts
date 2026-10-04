@@ -12,6 +12,7 @@ export type ResultadoCaso = {
   verificacao: Verificacao;
   juiz: AvaliacaoJuiz | null;
   erroJuiz?: string;
+  tokensJuiz?: { entrada: number; saida: number };
 };
 
 export type PlacarModelo = {
@@ -99,4 +100,32 @@ function custoPorMensagem(
     0,
   );
   return total / turnos.length;
+}
+
+/**
+ * Fronteira custo × qualidade. Um modelo é dominado quando outro tem nota
+ * maior ou igual E custo por mensagem menor ou igual, sendo estritamente
+ * melhor em pelo menos um dos dois. Dominado sai da discussão: sempre existe
+ * uma escolha que não perde em nada para ele.
+ *
+ * null = sem nota ou sem custo; fica fora da comparação em vez de ser julgado
+ * com número que não temos.
+ */
+export function marcarFronteira<
+  T extends { modelo: string; notaMedia: number | null; custoPorMensagem: number | null },
+>(placar: T[]): (T & { dominado: boolean | null })[] {
+  const comparaveis = placar.filter((p) => p.notaMedia !== null && p.custoPorMensagem !== null);
+  return placar.map((p) => {
+    if (p.notaMedia === null || p.custoPorMensagem === null) return { ...p, dominado: null };
+    const nota = p.notaMedia;
+    const custo = p.custoPorMensagem;
+    const dominado = comparaveis.some(
+      (o) =>
+        o.modelo !== p.modelo &&
+        o.notaMedia! >= nota &&
+        o.custoPorMensagem! <= custo &&
+        (o.notaMedia! > nota || o.custoPorMensagem! < custo),
+    );
+    return { ...p, dominado };
+  });
 }

@@ -87,16 +87,27 @@ ${lista(caso.esperado.naoDeve)}
 ${conversa}`;
 }
 
+export type Julgamento = {
+  avaliacao: AvaliacaoJuiz;
+  /** Consumo do juiz: entra no custo do estudo, não no custo do produto. */
+  tokensEntrada: number;
+  tokensSaida: number;
+};
+
 export async function julgar(
   caso: Caso,
   turnos: Turno[],
   modeloJuiz: LanguageModel,
-): Promise<AvaliacaoJuiz> {
-  const { output } = await generateText({
+): Promise<Julgamento> {
+  const { output, totalUsage } = await generateText({
     model: modeloJuiz,
     system: INSTRUCOES,
     prompt: montarPromptJuiz(caso, turnos),
     output: Output.object({ schema: avaliacaoJuizSchema }),
   });
-  return { ...output, nota: Math.min(10, Math.max(0, output.nota)) };
+  return {
+    avaliacao: { ...output, nota: Math.min(10, Math.max(0, output.nota)) },
+    tokensEntrada: totalUsage.inputTokens ?? 0,
+    tokensSaida: totalUsage.outputTokens ?? 0,
+  };
 }

@@ -27,6 +27,9 @@ const { values } = parseArgs({
     juiz: { type: "string" },
     casos: { type: "string" },
     paralelo: { type: "string", default: "3" },
+    // Premissa de uso para projetar o custo mensal por assinante. Não é dado
+    // medido: ajuste quando houver uso real.
+    "mensagens-por-mes": { type: "string", default: "100" },
   },
 });
 
@@ -77,7 +80,12 @@ async function main() {
       const verificacao = verificar(caso, turnos);
       let resultado: ResultadoCaso = { caso, modelo: modeloId, turnos, verificacao, juiz: null };
       try {
-        resultado = { ...resultado, juiz: await julgar(caso, turnos, modeloJuiz) };
+        const j = await julgar(caso, turnos, modeloJuiz);
+        resultado = {
+          ...resultado,
+          juiz: j.avaliacao,
+          tokensJuiz: { entrada: j.tokensEntrada, saida: j.tokensSaida },
+        };
       } catch (error) {
         resultado = {
           ...resultado,
@@ -103,7 +111,13 @@ async function main() {
   );
   await writeFile(
     join(pasta, `${nome}.html`),
-    gerarRelatorioHtml({ geradoEm, juiz: juizId, resultados, placar }),
+    gerarRelatorioHtml({
+      geradoEm,
+      juiz: juizId,
+      resultados,
+      placar,
+      mensagensPorMes: Math.max(1, Number(values["mensagens-por-mes"]) || 100),
+    }),
   );
 
   console.log(

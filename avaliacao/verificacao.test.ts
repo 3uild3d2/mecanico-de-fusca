@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Caso } from "./casos";
-import { calcularPlacar } from "./placar";
+import { calcularPlacar, marcarFronteira } from "./placar";
 import { type Turno, verificar } from "./verificacao";
 
 function caso(parcial: Partial<Caso> = {}): Caso {
@@ -189,5 +189,31 @@ describe("calcularPlacar", () => {
       { apenasRevisados: false, preco: () => null },
     );
     expect(placar[0]?.custoPorMensagem).toBeNull();
+  });
+});
+
+describe("marcarFronteira — custo entra no estudo", () => {
+  const p = (modelo: string, notaMedia: number | null, custoPorMensagem: number | null) => ({
+    modelo,
+    notaMedia,
+    custoPorMensagem,
+  });
+
+  it("dominado = existe outro com nota maior ou igual E custo menor ou igual, e melhor em algum", () => {
+    const r = marcarFronteira([
+      p("barato-bom", 7, 0.001),
+      p("caro-igual", 7, 0.01), // mesma nota, mais caro: dominado
+      p("caro-melhor", 9, 0.02), // melhor e mais caro: fronteira
+      p("barato-ruim", 4, 0.0005), // pior e mais barato: fronteira
+      p("caro-pior", 5, 0.03), // pior e mais caro: dominado
+    ]);
+    const dominados = r.filter((x) => x.dominado).map((x) => x.modelo);
+    expect(dominados.sort()).toEqual(["caro-igual", "caro-pior"]);
+  });
+
+  it("sem nota ou sem custo, o modelo não entra na comparação", () => {
+    const r = marcarFronteira([p("sem-custo", 9, null), p("ok", 5, 0.001)]);
+    expect(r.find((x) => x.modelo === "sem-custo")?.dominado).toBeNull();
+    expect(r.find((x) => x.modelo === "ok")?.dominado).toBe(false);
   });
 });

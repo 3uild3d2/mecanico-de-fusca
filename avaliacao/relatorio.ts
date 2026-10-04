@@ -1,4 +1,5 @@
-import type { PlacarModelo, ResultadoCaso } from "./placar";
+import { marcarFronteira, type PlacarModelo, type ResultadoCaso } from "./placar";
+import { precoPorMilhao } from "./precos";
 
 // Relatório HTML autocontido da bateria. Sem I/O: recebe os dados, devolve o
 // texto. Todo texto vindo de caso ou de modelo passa por esc() — a resposta de
@@ -51,6 +52,65 @@ function tabelaPlacar(placar: PlacarModelo[]): string {
   <th>Painel de hipóteses</th><th>Inventou número</th><th>Registro errado</th>
   <th>Falhas objetivas</th><th>Custo por mensagem</th><th>Tokens por caso</th><th>Tempo por caso</th>
 </tr></thead>
+<tbody>${linhas}</tbody>
+</table></div>`;
+}
+
+function custoTokens(modelo: string, entrada: number, saida: number): number | null {
+  const p = precoPorMilhao(modelo);
+  return p ? (entrada * p.entrada + saida * p.saida) / 1_000_000 : null;
+}
+
+/** Quanto o próprio estudo custou: modelos avaliados + juiz. Quem paga é o dono. */
+function custoDoEstudo(resultados: ResultadoCaso[], juiz: string) {
+  let modelos = 0;
+  let juizTotal = 0;
+  let incompleto = false;
+  for (const r of resultados) {
+    for (const t of r.turnos) {
+      const c = custoTokens(r.modelo, t.tokensEntrada, t.tokensSaida);
+      if (c === null) incompleto = true;
+      else modelos += c;
+    }
+    if (r.tokensJuiz) {
+      const c = custoTokens(juiz, r.tokensJuiz.entrada, r.tokensJuiz.saida);
+      if (c === null) incompleto = true;
+      else juizTotal += c;
+    }
+  }
+  return { modelos, juiz: juizTotal, incompleto };
+}
+
+function dolarMensal(v: number | null): string {
+  return v === null
+    ? "—"
+    : `US$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function secaoCusto(placar: PlacarModelo[], mensagensPorMes: number): string {
+  const linhas = marcarFronteira(placar)
+    .sort((a, b) => (a.custoPorMensagem ?? Infinity) - (b.custoPorMensagem ?? Infinity))
+    .map((p) => {
+      const status =
+        p.dominado === null
+          ? '<span class="fraco">sem dado</span>'
+          : p.dominado
+            ? '<span class="ruim">dominado</span>'
+            : '<span class="ok">fronteira</span>';
+      const mensal = p.custoPorMensagem === null ? null : p.custoPorMensagem * mensagensPorMes;
+      return `<tr${p.dominado ? ' class="apagado"' : ""}>
+  <th scope="row">${esc(nomeCurto(p.modelo))}</th>
+  <td>${num(p.notaMedia)}</td>
+  <td>${dolar(p.custoPorMensagem)}</td>
+  <td>${dolarMensal(mensal)}</td>
+  <td>${status}</td>
+</tr>`;
+    })
+    .join("\n");
+
+  return `<p class="leitura">Ordenado do mais barato para o mais caro. <b>Fronteira</b> = nenhum outro modelo é ao mesmo tempo melhor e mais barato; <b>dominado</b> = existe opção que não perde em nada para ele. Custo mensal por assinante supõe <b>${mensagensPorMes} mensagens por mês</b> — premissa, não medição.</p>
+<div class="rolagem"><table class="custo">
+<thead><tr><th>Modelo</th><th>Nota média</th><th>Custo por mensagem</th><th>Custo por assinante/mês</th><th></th></tr></thead>
 <tbody>${linhas}</tbody>
 </table></div>`;
 }
@@ -115,7 +175,9 @@ export function gerarRelatorioHtml(dados: {
   juiz: string;
   resultados: ResultadoCaso[];
   placar: PlacarModelo[];
+  mensagensPorMes: number;
 }): string {
+  const estudo = custoDoEstudo(dados.resultados, dados.juiz);
   const porCaso = new Map<string, ResultadoCaso[]>();
   for (const r of dados.resultados) {
     porCaso.set(r.caso.id, [...(porCaso.get(r.caso.id) ?? []), r]);
@@ -150,14 +212,20 @@ th:first-child,thead th{text-align:left}thead th{color:var(--fraco);font-weight:
 details{margin-top:8px}summary{cursor:pointer;color:var(--fraco)}
 .fala{margin-top:10px}.resposta{white-space:pre-wrap;border-left:3px solid var(--linha);padding-left:10px;margin:6px 0}
 .ferramenta{font-size:12px;color:var(--fraco);overflow-wrap:anywhere}code{font-size:12px}
-small{color:var(--fraco)}
+small{color:var(--fraco)}.fraco{color:var(--fraco)}.leitura{color:var(--fraco);max-width:820px}
+tr.apagado{opacity:.55}table.custo{min-width:560px}
 </style></head>
 <body><main>
 <h1>Bateria do Mecânico de Fusca</h1>
 <p class="sub">Gerado em ${esc(dados.geradoEm.toLocaleString("pt-BR"))} · juiz: ${esc(nomeCurto(dados.juiz))} · ${porCaso.size} casos${
     naoRevisados ? ` · <span class="ruim">${naoRevisados} ainda não revisados pelo dono</span>` : ""
   }</p>
-<h2>Placar</h2>
+<h2>Custo × qualidade</h2>
+${secaoCusto(dados.placar, dados.mensagensPorMes)}
+<p class="leitura">Este estudo custou ${dolar(estudo.modelos + estudo.juiz)}: ${dolar(estudo.modelos)} nos modelos avaliados e ${dolar(estudo.juiz)} no juiz${
+    estudo.incompleto ? " (parcial: há modelo sem preço na tabela)" : ""
+  }.</p>
+<h2>Placar completo</h2>
 ${tabelaPlacar(dados.placar)}
 <h2>Casos</h2>
 ${[...porCaso.entries()].map(([id, rs]) => blocoCaso(id, rs)).join("\n")}
