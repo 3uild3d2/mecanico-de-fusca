@@ -8,6 +8,16 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 
 ## Onde o trabalho está
 
+### Plano em execução (aprovado pelo dono em 2026-10-04)
+
+Origem: revisão externa da arquitetura (ChatGPT), **conferida ponto a ponto no código** antes de entrar aqui — todos os achados procederam. Ordem acordada:
+
+1. ~~Limites do `/api/chat` aplicados antes do recorte~~ — **feito em 2026-10-04.** Ver Decisões.
+2. Bateria de casos para avaliar o mecânico, usada também como benchmark de modelos da OpenAI.
+3. `/api/chat` com sessão obrigatória e limite de uso; downloads de anexo restritos ao Storage do projeto.
+4. Histórico e conversa separados por veículo (migration nova).
+5. Persistência só do que mudou; resumo estruturado do diagnóstico; RAG piloto.
+
 **Fase atual: FASE 2 (migração para Supabase), quase fechada no código.** A camada de dados, autenticação, anexos e exclusão de conta já foram trocados para Supabase; Firebase saiu do código e da dependência. Falta validação manual do login Google real e da exclusão de conta em ambiente do dono.
 
 ### O que já está feito na Fase 2 (2026-07-26)
@@ -32,7 +42,8 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 - **Firebase (legado):** saiu do código e da dependência em 2026-07-26. O projeto `suporte-24h` pode continuar existindo no dashboard, mas o app não deve mais depender dele.
 - **Só existe o perfil do dono para migrar** — decisão dele: sem script de migração de dados, começar limpo no Supabase.
 - **Lixo de teste no banco:** 3+ usuários anônimos e uma thread "Fusca esquentando", criados pelos testes de RLS. Limpar quando conveniente (Dashboard → Authentication → Users).
-- **Branch:** `reestruturacao-fase-1`, com remote em `github.com/3uild3d2/mecanico-de-fusca`. O bloco da fundação Supabase foi commitado e enviado em 2026-07-26.
+- **Branch:** `reestruturacao-fase-1`, com remote em `github.com/3uild3d2/mecanico-de-fusca`. O bloco da fundação Supabase foi commitado e enviado em 2026-07-26; a troca da camada de dados ficou só local até 2026-10-04, quando foi commitada e enviada (`8f5d44c`).
+- **Plano gratuito do Supabase pausa o projeto após 7 dias sem uso** e remove o DNS dele. Ficou pausado de agosto até 2026-10-03, quando o dono reativou pelo dashboard (dados intactos). Sintoma de pausa: `ERR_NAME_NOT_RESOLVED` / "o nome DNS não existe".
 
 **Decisões do RAG já tomadas (Fase 3):** embeddings `gemini-embedding-001` a **768 dimensões** — já gravado no schema (`chunks.embedding vector(768)`). Conteúdo será pesquisado e redigido em conjunto com o dono, em markdown com front matter dentro do repositório, começando por um tópico piloto.
 
@@ -41,6 +52,14 @@ Entrada nova vai no topo de cada seção, com data absoluta.
 ## Pendências conhecidas
 
 Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimento.
+
+- **Histórico do carro misturado entre veículos** (achado em 2026-10-04, etapa 4 do plano). `vehicle_events` grava `vehicle_id`, mas `events-api.ts` carrega por `user_id` só; e `threads` não tem `vehicle_id`, então a conversa usa a ficha do veículo *ativo na garagem*, não a do carro dela. Com Fusca e Brasília cadastrados, a bobina trocada num entra no contexto do outro, e reabrir uma conversa antiga com outro carro selecionado troca a ficha.
+
+- **Servidor baixa qualquer URL recebida** (achado em 2026-10-04, etapa 3). `fetchAsDataUrl` em `server/ai/messages.ts` aceita qualquer `http(s)` vinda no corpo do pedido — e o `/api/chat` não exige sessão. É SSRF: alguém pode fazer o servidor acessar destinos indevidos. Restringir ao domínio do Storage do projeto e não seguir redirecionamentos. (O bucket público é decisão separada, registrada em 2026-07-26.)
+
+- **Persistência regrava a conversa inteira** (achado em 2026-10-04, etapa 5). `persistThreadMessages` faz `upsert` de todas as mensagens a cada alteração, com debounce de 600 ms. O banco já tem uma linha por mensagem, então o custo é desnecessário; e fechar a aba dentro da janela de 600 ms perde a última escrita.
+
+- **Hipóteses saem da janela de 24 mensagens** (achado em 2026-10-04, etapa 5). O painel deriva o raciocínio de todas as mensagens, mas o modelo só recebe as 24 últimas: numa investigação longa, ele esquece hipóteses já descartadas e pode voltar a elas. Proposta: injetar o último estado de `atualizarHipoteses` no prompt.
 
 - **`database.types.ts` é escrito à mão.** Não é verificado contra o banco: se divergir do SQL, o TypeScript mente. Regenerar assim que possível com `npx supabase gen types typescript --project-id ougesilqshtsgpnfmdaw` (exige login no CLI, que ainda não foi feito nesta máquina).
 
@@ -71,6 +90,14 @@ Coisas encontradas e deliberadamente não resolvidas ainda. Não são esquecimen
 ---
 
 ## Decisões
+
+### 2026-10-04 — Limites do `/api/chat`: janela de mensagens no cliente, teto de eventos como defesa
+
+**Bug:** o schema recusava pedidos com mais de 60 eventos ou 200 mensagens, mas o cliente enviava *todos* — o recorte só acontecia depois da validação. Como o agente registra eventos sozinho, todo usuário ativo chegaria a 60 e, dali em diante, toda mensagem seria recusada com 400. O comentário em `schema.ts` dizia que o cliente já mandava o recorte; não mandava.
+
+**Mensagens:** o cliente passou a enviar só as últimas `JANELA_HISTORICO_MENSAGENS` (24), a mesma janela que o servidor aplica — a constante mora em `features/chat/model.ts` e os dois lados a importam. A conversa inteira continua no estado local e no banco.
+
+**Eventos:** o teto subiu para 1000 (~330 KB no pior caso) e virou explicitamente defesa contra abuso. **Descartado:** recortar os eventos no cliente. O alerta de recorrência de `buildHistoryContext` conta *todos* os episódios do sistema em foco, não só os 25 que entram no prompt; com recorte, o número podia sair errado — e "não invente número" vale para o que o agente afirma. A solução definitiva é o servidor buscar os eventos no banco (etapa 4), o que elimina o envio.
 
 ### 2026-08-13 — Supressão de warnings de hidratação e diagnóstico de Supabase inativo
 
